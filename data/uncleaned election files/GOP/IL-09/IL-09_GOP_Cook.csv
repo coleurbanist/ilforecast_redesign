@@ -1,0 +1,224 @@
+JoinField,JoinField_alt,John Elleson,Paul Friedman,Rocio Cleveland,Dongbo Mark Su,Total Voters
+COOK:7501001,COOK:Evanston Ward 1 Precinct 1,1,1,0,0,2
+COOK:7501002,COOK:Evanston Ward 1 Precinct 2,3,2,0,3,8
+COOK:7501003,COOK:Evanston Ward 1 Precinct 3,2,2,0,1,5
+COOK:7501004,COOK:Evanston Ward 1 Precinct 4,9,3,3,2,17
+COOK:7502001,COOK:Evanston Ward 2 Precinct 1,3,6,7,2,18
+COOK:7502002,COOK:Evanston Ward 2 Precinct 2,1,2,1,2,6
+COOK:7502003,COOK:Evanston Ward 2 Precinct 3,1,2,0,0,3
+COOK:7502004,COOK:Evanston Ward 2 Precinct 4,5,4,1,2,12
+COOK:7502005,COOK:Evanston Ward 2 Precinct 5,4,1,2,1,8
+COOK:7503001,COOK:Evanston Ward 3 Precinct 1,5,2,1,2,10
+COOK:7503002,COOK:Evanston Ward 3 Precinct 2,8,3,0,2,13
+COOK:7503003,COOK:Evanston Ward 3 Precinct 3,3,2,0,0,5
+COOK:7503004,COOK:Evanston Ward 3 Precinct 4,10,5,0,4,19
+COOK:7503005,COOK:Evanston Ward 3 Precinct 5,3,3,0,0,6
+COOK:7504001,COOK:Evanston Ward 4 Precinct 1,2,1,0,1,4
+COOK:7504002,COOK:Evanston Ward 4 Precinct 2,0,4,1,0,5
+COOK:7504003,COOK:Evanston Ward 4 Precinct 3,1,1,1,0,3
+COOK:7504004,COOK:Evanston Ward 4 Precinct 4,4,5,0,5,14
+COOK:7504005,COOK:Evanston Ward 4 Precinct 5,8,3,0,0,11
+COOK:7504006,COOK:Evanston Ward 4 Precinct 6,9,9,1,3,22
+COOK:7504007,COOK:Evanston Ward 4 Precinct 7,1,2,0,3,6
+COOK:7505001,COOK:Evanston Ward 5 Precinct 1,3,2,0,0,5
+COOK:7505002,COOK:Evanston Ward 5 Precinct 2,7,4,2,2,15
+COOK:7505003,COOK:Evanston Ward 5 Precinct 3,2,2,0,2,6
+COOK:7506001,COOK:Evanston Ward 6 Precinct 1,4,10,3,2,19
+COOK:7506002,COOK:Evanston Ward 6 Precinct 2,8,0,1,0,9
+COOK:7506003,COOK:Evanston Ward 6 Precinct 3,5,5,1,3,14
+COOK:7506004,COOK:Evanston Ward 6 Precinct 4,16,12,3,4,35
+COOK:7506005,COOK:Evanston Ward 6 Precinct 5,6,3,1,1,11
+COOK:7506006,COOK:Evanston Ward 6 Precinct 6,6,4,3,2,15
+COOK:7507001,COOK:Evanston Ward 7 Precinct 1,5,3,1,1,10
+COOK:7507002,COOK:Evanston Ward 7 Precinct 2,6,10,1,3,20
+COOK:7507003,COOK:Evanston Ward 7 Precinct 3,0,0,0,0,0
+COOK:7507004,COOK:Evanston Ward 7 Precinct 4,2,0,1,1,4
+COOK:7507005,COOK:Evanston Ward 7 Precinct 5,4,2,2,3,11
+COOK:7508001,COOK:Evanston Ward 8 Precinct 1,4,8,0,3,15
+COOK:7508002,COOK:Evanston Ward 8 Precinct 2,6,6,1,1,14
+COOK:7508003,COOK:Evanston Ward 8 Precinct 3,0,2,1,2,5
+COOK:7508004,COOK:Evanston Ward 8 Precinct 4,6,1,2,3,12
+COOK:7508005,COOK:Evanston Ward 8 Precinct 5,1,2,0,1,4
+COOK:7509001,COOK:Evanston Ward 9 Precinct 1,2,3,0,0,5
+COOK:7509002,COOK:Evanston Ward 9 Precinct 2,5,3,4,1,13
+COOK:7509003,COOK:Evanston Ward 9 Precinct 3,4,4,1,1,10
+COOK:7509004,COOK:Evanston Ward 9 Precinct 4,3,8,1,0,12
+COOK:7509005,COOK:Evanston Ward 9 Precinct 5,7,0,0,3,10
+COOK:8000008,COOK:Maine Precinct 8,39,16,4,6,65
+COOK:8000011,COOK:Maine Precinct 11,9,4,1,1,15
+COOK:8000015,COOK:Maine Precinct 15,14,11,6,2,33
+COOK:8000020,COOK:Maine Precinct 20,15,11,4,3,33
+COOK:8000029,COOK:Maine Precinct 29,39,21,10,6,76
+COOK:8000030,COOK:Maine Precinct 30,44,32,7,2,85
+COOK:8000031,COOK:Maine Precinct 31,28,11,7,5,51
+COOK:8000032,COOK:Maine Precinct 32,36,27,3,4,70
+COOK:8000039,COOK:Maine Precinct 39,40,14,2,3,59
+COOK:8000040,COOK:Maine Precinct 40,12,8,4,6,30
+COOK:8000043,COOK:Maine Precinct 43,42,17,2,8,69
+COOK:8000044,COOK:Maine Precinct 44,18,10,1,0,29
+COOK:8000046,COOK:Maine Precinct 46,34,19,6,2,61
+COOK:8000051,COOK:Maine Precinct 51,23,8,5,7,43
+COOK:8000052,COOK:Maine Precinct 52,16,19,2,1,38
+COOK:8000055,COOK:Maine Precinct 55,33,21,3,4,61
+COOK:8000058,COOK:Maine Precinct 58,37,37,7,3,84
+COOK:8000059,COOK:Maine Precinct 59,28,22,6,6,62
+COOK:8000060,COOK:Maine Precinct 60,42,28,8,5,83
+COOK:8000063,COOK:Maine Precinct 63,9,8,5,3,25
+COOK:8000069,COOK:Maine Precinct 69,17,15,3,5,40
+COOK:8000072,COOK:Maine Precinct 72,34,30,11,2,77
+COOK:8000073,COOK:Maine Precinct 73,29,12,1,7,49
+COOK:8000074,COOK:Maine Precinct 74,16,12,2,1,31
+COOK:8000075,COOK:Maine Precinct 75,23,15,5,3,46
+COOK:8000076,COOK:Maine Precinct 76,8,10,0,2,20
+COOK:8000083,COOK:Maine Precinct 83,22,12,1,2,37
+COOK:8100003,COOK:New Trier Precinct 3,18,9,7,6,40
+COOK:8100013,COOK:New Trier Precinct 13,36,16,5,5,62
+COOK:8100017,COOK:New Trier Precinct 17,15,11,4,4,34
+COOK:8100018,COOK:New Trier Precinct 18,1,0,0,1,2
+COOK:8100021,COOK:New Trier Precinct 21,10,17,6,9,42
+COOK:8100024,COOK:New Trier Precinct 24,19,14,6,5,44
+COOK:8100026,COOK:New Trier Precinct 26,27,23,8,6,64
+COOK:8100027,COOK:New Trier Precinct 27,9,6,1,4,20
+COOK:8100031,COOK:New Trier Precinct 31,9,3,2,1,15
+COOK:8100032,COOK:New Trier Precinct 32,6,3,1,0,10
+COOK:8100033,COOK:New Trier Precinct 33,12,9,0,3,24
+COOK:8100034,COOK:New Trier Precinct 34,13,7,1,4,25
+COOK:8100036,COOK:New Trier Precinct 36,21,19,0,12,52
+COOK:8100037,COOK:New Trier Precinct 37,18,4,3,9,34
+COOK:8100038,COOK:New Trier Precinct 38,12,12,3,10,37
+COOK:8100039,COOK:New Trier Precinct 39,17,7,6,3,33
+COOK:8200001,COOK:Niles Precinct 1,38,20,5,2,65
+COOK:8200002,COOK:Niles Precinct 2,20,18,1,4,43
+COOK:8200003,COOK:Niles Precinct 3,35,19,8,4,66
+COOK:8200004,COOK:Niles Precinct 4,6,10,3,6,25
+COOK:8200005,COOK:Niles Precinct 5,9,7,2,3,21
+COOK:8200006,COOK:Niles Precinct 6,29,10,11,6,56
+COOK:8200007,COOK:Niles Precinct 7,14,15,3,4,36
+COOK:8200008,COOK:Niles Precinct 8,4,3,0,0,7
+COOK:8200009,COOK:Niles Precinct 9,30,26,3,6,65
+COOK:8200010,COOK:Niles Precinct 10,17,13,6,1,37
+COOK:8200011,COOK:Niles Precinct 11,10,9,2,2,23
+COOK:8200012,COOK:Niles Precinct 12,12,5,1,3,21
+COOK:8200013,COOK:Niles Precinct 13,37,24,5,6,72
+COOK:8200014,COOK:Niles Precinct 14,5,11,2,7,25
+COOK:8200015,COOK:Niles Precinct 15,18,12,7,4,41
+COOK:8200016,COOK:Niles Precinct 16,12,20,1,2,35
+COOK:8200017,COOK:Niles Precinct 17,14,12,2,6,34
+COOK:8200018,COOK:Niles Precinct 18,13,12,6,4,35
+COOK:8200019,COOK:Niles Precinct 19,4,9,2,0,15
+COOK:8200020,COOK:Niles Precinct 20,22,8,6,5,41
+COOK:8200021,COOK:Niles Precinct 21,2,3,2,1,8
+COOK:8200022,COOK:Niles Precinct 22,8,10,3,2,23
+COOK:8200023,COOK:Niles Precinct 23,8,11,3,0,22
+COOK:8200024,COOK:Niles Precinct 24,14,9,4,6,33
+COOK:8200025,COOK:Niles Precinct 25,4,5,1,0,10
+COOK:8200026,COOK:Niles Precinct 26,13,12,0,0,25
+COOK:8200027,COOK:Niles Precinct 27,6,7,3,4,20
+COOK:8200028,COOK:Niles Precinct 28,6,5,4,0,15
+COOK:8200029,COOK:Niles Precinct 29,9,5,1,1,16
+COOK:8200030,COOK:Niles Precinct 30,7,4,2,3,16
+COOK:8200031,COOK:Niles Precinct 31,6,9,1,6,22
+COOK:8200032,COOK:Niles Precinct 32,7,7,1,3,18
+COOK:8200033,COOK:Niles Precinct 33,17,11,0,4,32
+COOK:8200034,COOK:Niles Precinct 34,11,20,2,7,40
+COOK:8200035,COOK:Niles Precinct 35,19,15,3,8,45
+COOK:8200036,COOK:Niles Precinct 36,3,0,0,3,6
+COOK:8200037,COOK:Niles Precinct 37,5,10,9,4,28
+COOK:8200038,COOK:Niles Precinct 38,32,21,5,6,64
+COOK:8200039,COOK:Niles Precinct 39,13,11,3,2,29
+COOK:8200040,COOK:Niles Precinct 40,11,8,1,5,25
+COOK:8200041,COOK:Niles Precinct 41,11,20,3,1,35
+COOK:8200042,COOK:Niles Precinct 42,14,7,0,5,26
+COOK:8200043,COOK:Niles Precinct 43,32,32,9,7,80
+COOK:8200044,COOK:Niles Precinct 44,14,6,0,1,21
+COOK:8200045,COOK:Niles Precinct 45,10,6,0,1,17
+COOK:8200046,COOK:Niles Precinct 46,8,6,1,4,19
+COOK:8200047,COOK:Niles Precinct 47,5,5,0,2,12
+COOK:8200048,COOK:Niles Precinct 48,8,5,2,0,15
+COOK:8200049,COOK:Niles Precinct 49,8,6,1,0,15
+COOK:8200050,COOK:Niles Precinct 50,25,10,2,6,43
+COOK:8200051,COOK:Niles Precinct 51,11,3,3,1,18
+COOK:8200052,COOK:Niles Precinct 52,11,11,5,3,30
+COOK:8200053,COOK:Niles Precinct 53,18,24,3,5,50
+COOK:8200054,COOK:Niles Precinct 54,13,8,3,5,29
+COOK:8200055,COOK:Niles Precinct 55,3,5,4,3,15
+COOK:8200056,COOK:Niles Precinct 56,15,7,1,6,29
+COOK:8200057,COOK:Niles Precinct 57,25,9,1,3,38
+COOK:8200058,COOK:Niles Precinct 58,16,15,1,2,34
+COOK:8200059,COOK:Niles Precinct 59,25,14,3,3,45
+COOK:8200060,COOK:Niles Precinct 60,21,29,9,7,66
+COOK:8200061,COOK:Niles Precinct 61,12,15,2,5,34
+COOK:8200062,COOK:Niles Precinct 62,8,10,5,1,24
+COOK:8300004,COOK:Northfield Precinct 4,20,12,8,3,43
+COOK:8300005,COOK:Northfield Precinct 5,15,9,3,4,31
+COOK:8300006,COOK:Northfield Precinct 6,27,17,4,1,49
+COOK:8300007,COOK:Northfield Precinct 7,40,13,3,4,60
+COOK:8300008,COOK:Northfield Precinct 8,37,23,5,5,70
+COOK:8300009,COOK:Northfield Precinct 9,20,12,6,2,40
+COOK:8300010,COOK:Northfield Precinct 10,11,11,4,4,30
+COOK:8300012,COOK:Northfield Precinct 12,49,19,8,3,79
+COOK:8300013,COOK:Northfield Precinct 13,10,8,3,1,22
+COOK:8300019,COOK:Northfield Precinct 19,28,14,3,1,46
+COOK:8300020,COOK:Northfield Precinct 20,20,16,0,5,41
+COOK:8300021,COOK:Northfield Precinct 21,25,23,7,4,59
+COOK:8300023,COOK:Northfield Precinct 23,26,12,6,4,48
+COOK:8300024,COOK:Northfield Precinct 24,9,14,4,7,34
+COOK:8300025,COOK:Northfield Precinct 25,20,6,9,4,39
+COOK:8300027,COOK:Northfield Precinct 27,11,14,4,1,30
+COOK:8300030,COOK:Northfield Precinct 30,16,11,2,2,31
+COOK:8300031,COOK:Northfield Precinct 31,48,10,3,2,63
+COOK:8300033,COOK:Northfield Precinct 33,2,5,0,2,9
+COOK:8300035,COOK:Northfield Precinct 35,26,11,3,5,45
+COOK:8300037,COOK:Northfield Precinct 37,36,25,4,5,70
+COOK:8300038,COOK:Northfield Precinct 38,15,10,2,4,31
+COOK:8300039,COOK:Northfield Precinct 39,12,4,2,2,20
+COOK:8300041,COOK:Northfield Precinct 41,11,14,1,3,29
+COOK:8300042,COOK:Northfield Precinct 42,20,26,4,2,52
+COOK:8300043,COOK:Northfield Precinct 43,0,0,0,0,0
+COOK:8300044,COOK:Northfield Precinct 44,15,7,3,3,28
+COOK:8300045,COOK:Northfield Precinct 45,32,7,4,7,50
+COOK:8300048,COOK:Northfield Precinct 48,12,16,5,3,36
+COOK:8300049,COOK:Northfield Precinct 49,8,6,3,2,19
+COOK:8300051,COOK:Northfield Precinct 51,67,40,11,7,125
+COOK:8300052,COOK:Northfield Precinct 52,23,8,3,2,36
+COOK:8300053,COOK:Northfield Precinct 53,18,5,2,1,26
+COOK:8300056,COOK:Northfield Precinct 56,37,21,5,1,64
+COOK:8300057,COOK:Northfield Precinct 57,20,10,2,2,34
+COOK:9600006,COOK:Wheeling Precinct 6,14,10,1,4,29
+COOK:9600008,COOK:Wheeling Precinct 8,37,27,7,2,73
+COOK:9600011,COOK:Wheeling Precinct 11,17,6,2,1,26
+COOK:9600012,COOK:Wheeling Precinct 12,41,28,11,9,89
+COOK:9600016,COOK:Wheeling Precinct 16,7,9,0,1,17
+COOK:9600017,COOK:Wheeling Precinct 17,12,20,4,3,39
+COOK:9600021,COOK:Wheeling Precinct 21,31,20,5,3,59
+COOK:9600027,COOK:Wheeling Precinct 27,36,24,5,3,68
+COOK:9600028,COOK:Wheeling Precinct 28,53,29,12,0,94
+COOK:9600030,COOK:Wheeling Precinct 30,44,27,4,3,78
+COOK:9600038,COOK:Wheeling Precinct 38,12,18,5,0,35
+COOK:9600040,COOK:Wheeling Precinct 40,6,1,0,0,7
+COOK:9600043,COOK:Wheeling Precinct 43,29,19,8,1,57
+COOK:9600044,COOK:Wheeling Precinct 44,24,19,6,5,54
+COOK:9600046,COOK:Wheeling Precinct 46,9,3,1,2,15
+COOK:9600047,COOK:Wheeling Precinct 47,19,10,5,3,37
+COOK:9600048,COOK:Wheeling Precinct 48,2,1,0,0,3
+COOK:9600051,COOK:Wheeling Precinct 51,31,19,4,3,57
+COOK:9600052,COOK:Wheeling Precinct 52,27,15,6,2,50
+COOK:9600053,COOK:Wheeling Precinct 53,29,9,2,2,42
+COOK:9600054,COOK:Wheeling Precinct 54,46,31,1,4,82
+COOK:9600056,COOK:Wheeling Precinct 56,21,16,6,4,47
+COOK:9600058,COOK:Wheeling Precinct 58,28,13,4,2,47
+COOK:9600060,COOK:Wheeling Precinct 60,39,25,5,7,76
+COOK:9600061,COOK:Wheeling Precinct 61,79,46,22,10,157
+COOK:9600063,COOK:Wheeling Precinct 63,2,6,4,0,12
+COOK:9600065,COOK:Wheeling Precinct 65,49,27,12,7,95
+COOK:9600066,COOK:Wheeling Precinct 66,31,28,2,1,62
+COOK:9600067,COOK:Wheeling Precinct 67,27,13,5,2,47
+COOK:9600068,COOK:Wheeling Precinct 68,18,17,4,2,41
+COOK:9600069,COOK:Wheeling Precinct 69,66,30,4,1,101
+COOK:9600070,COOK:Wheeling Precinct 70,41,28,6,6,81
+COOK:9600072,COOK:Wheeling Precinct 72,16,18,9,2,45
+COOK:9600075,COOK:Wheeling Precinct 75,28,22,1,2,53
+COOK:9600077,COOK:Wheeling Precinct 77,9,1,0,1,11
+COOK:9600079,COOK:Wheeling Precinct 79,16,11,3,4,34
+COOK:9600080,COOK:Wheeling Precinct 80,19,16,2,4,41
+,COOK:Suburban Cook County,3809,2587,712,678,7786

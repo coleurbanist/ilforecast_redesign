@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Maps — Cole's Election Models</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+  <style>
+    .cem-tooltip {
+      background: rgba(13,17,23,0.97) !important;
+      border: 1px solid rgba(255,255,255,0.15) !important;
+      border-radius: 8px !important;
+      color: #e6edf3 !important;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.6) !important;
+      padding: 10px 14px !important;
+    }
+    .cem-tooltip::before { display: none !important; }
+    .leaflet-control-zoom a {
+      background: #1c2330 !important; color: #e6edf3 !important;
+      border-color: rgba(255,255,255,0.1) !important;
+    }
+    .leaflet-control-zoom a:hover { background: #242d3a !important; }
+    .leaflet-control-attribution {
+      background: rgba(13,17,23,0.8) !important;
+      color: #484f58 !important; font-size: 10px !important;
+    }
+    .leaflet-control-attribution a { color: #484f58 !important; }
+
+    #loading-overlay {
+      position: fixed; inset: 0; z-index: 99999;
+      background: var(--bg-base);
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 16px;
+      transition: opacity 0.4s;
+    }
+    #loading-overlay.hidden { opacity: 0; pointer-events: none; }
+    .loading-spinner {
+      width: 36px; height: 36px;
+      border: 3px solid rgba(255,255,255,0.1);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-text { color: var(--text-secondary); font-size: 0.875rem; }
+    .loading-sub  { color: var(--text-muted); font-size: 0.775rem; }
+
+    .stats-section { margin-top: 16px; }
+    .stats-section-title {
+      font-size: 0.875rem; font-weight: 600;
+      color: var(--text-secondary); margin-bottom: 12px;
+      padding-bottom: 8px; border-bottom: 1px solid var(--border);
+    }
+    .map-legend {
+      display: flex; flex-wrap: wrap; gap: 8px;
+      align-items: center; min-height: 24px;
+    }
+    .legend-item {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 0.775rem; color: var(--text-secondary);
+    }
+    .legend-swatch {
+      width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0;
+    }
+  </style>
+</head>
+<body>
+
+<div id="loading-overlay">
+  <div class="loading-spinner"></div>
+  <div class="loading-text">Loading election data…</div>
+  <div class="loading-sub">This may take a moment on first load</div>
+</div>
+
+
+
+<div class="page-content">
+  <div class="maps-layout">
+
+    <aside class="maps-sidebar">
+      <div style="padding:4px 8px 8px">
+        <input id="race-search" type="text" placeholder="Search races…" autocomplete="off"
+          style="width:100%;background:var(--bg-raised);border:1px solid var(--border);
+                 border-radius:6px;padding:7px 10px;color:var(--text-primary);
+                 font-size:0.8rem;font-family:var(--font-body);outline:none;">
+      </div>
+      <div id="race-list"></div>
+    </aside>
+
+    <main class="map-main">
+
+      <div class="map-header">
+        <div id="map-title" class="map-title">Select a race</div>
+        <div id="map-subtitle" class="map-subtitle">Choose a race from the sidebar to get started</div>
+      </div>
+
+      <div class="map-controls" id="map-controls" style="display:none">
+        <div class="control-group">
+          <span class="control-label">View</span>
+          <button class="btn-toggle active" data-mode="winner">Winner Map</button>
+          <button class="btn-toggle" data-mode="heat">Heat Map</button>
+          <button class="btn-toggle" data-mode="group">Head to Head</button>
+        </div>
+        <div class="control-group" id="heat-candidate-control" style="display:none">
+          <span class="control-label">Candidate</span>
+          <select id="heat-candidate-select"
+            style="background:var(--bg-raised);border:none;color:var(--text-primary);
+                   font-family:var(--font-body);font-size:0.8rem;padding:4px 8px;
+                   border-radius:5px;cursor:pointer;outline:none;"></select>
+        </div>
+        <div class="control-group" id="geo-filter-control" style="display:none">
+          <span class="control-label">Area</span>
+          <div id="geo-filter-chips" style="display:flex;flex-wrap:wrap;gap:4px;"></div>
+        </div>
+      </div>
+
+      <div class="map-legend" id="map-legend"></div>
+      <div id="map-container"></div>
+
+      <div class="grouping-panel" id="grouping-panel" style="display:none">
+        <h3>Head to Head — Group Candidates</h3>
+        <p>Assign candidates to groups to compare them. Click a chip to cycle it through Group A → Group B → Group C → unassigned.</p>
+        <div class="groups-row" style="grid-template-columns: 1fr 1fr 1fr">
+            <div class="group-box" id="drop-zone-a" ondragover="event.preventDefault()" ondrop="ElectionUI.handleDrop(event,'a')">
+                <div class="group-box-label group-a">Group A</div>
+                <div id="group-a-chips"></div>
+                <div class="text-muted" id="group-a-empty" style="font-size:0.775rem;padding:4px 0">Drop candidates here</div>
+            </div>
+            <div class="group-box" id="drop-zone-b" ondragover="event.preventDefault()" ondrop="ElectionUI.handleDrop(event,'b')">
+                <div class="group-box-label group-b">Group B</div>
+                <div id="group-b-chips"></div>
+                <div class="text-muted" id="group-b-empty" style="font-size:0.775rem;padding:4px 0">Drop candidates here</div>
+            </div>
+            <div class="group-box" id="drop-zone-c" ondragover="event.preventDefault()" ondrop="ElectionUI.handleDrop(event,'c')">
+                <div class="group-box-label group-c">Group C</div>
+                <div id="group-c-chips"></div>
+                <div class="text-muted" id="group-c-empty" style="font-size:0.775rem;padding:4px 0">Drop candidates here</div>
+            </div>
+        </div>
+        <div style="margin-top:14px">
+            <div class="text-muted" style="margin-bottom:6px;font-size:0.775rem">Unassigned — drag to a group or click to assign to Group A</div>
+            <div id="unassigned-chips" style="display:flex;flex-wrap:wrap;gap:4px;min-height:32px;border:1px dashed var(--border);border-radius:6px;padding:4px;" ondragover="event.preventDefault()" ondrop="ElectionUI.handleDrop(event,null)"></div>
+        </div>
+      </div>
+
+      <div class="stats-section" id="stats-section" style="display:none">
+        <div class="stats-section-title" id="stats-title">District-Wide Results</div>
+        <div class="stats-grid" id="stats-grid"></div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="data.js"></script>
+<script src="map.js"></script>
+<script src="ui.js"></script>
+<script src="nav.js"></script>
+<script>
+  const JSON_PATH    = 'data/election_csvs/clean/2026/Primary/2026_primary.json';
+  const GEOJSON_PATH = 'data/election_shapefiles/IL24_slim.geojson';
+
+  ElectionData.load(JSON_PATH, GEOJSON_PATH)
+    .then(() => {
+      ElectionMap.init('map-container');
+      ElectionUI.init();
+      const overlay = document.getElementById('loading-overlay');
+      overlay.classList.add('hidden');
+      setTimeout(() => overlay.remove(), 500);
+    })
+    .catch(err => {
+      console.error('Failed to load data:', err);
+      document.querySelector('.loading-text').textContent = 'Failed to load data.';
+      document.querySelector('.loading-sub').textContent  = 'Check the browser console for details.';
+    });
+</script>
+
+</body>
+</html>
