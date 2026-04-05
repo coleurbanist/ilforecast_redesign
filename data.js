@@ -449,6 +449,29 @@ const ElectionData = (() => {
 
     return raw;
   }
+  function computeOrderingTotals(raceName, candidates, jurisdictionFilter = null) {
+    // candidates is an array of up to 3 candidate names
+    // Returns a Map: norm(jf) -> { ordering: 'ABC'|'ACB'|'BAC'|'BCA'|'CAB'|'CBA', votes: [a,b,c] }
+    const result = new Map();
+
+    for (const [jf, precinct] of Object.entries(_precincts)) {
+      if (jurisdictionFilter && !jurisdictionFilter.includes(jf.split(':')[0])) continue;
+      const raceData = precinct.races?.[raceName];
+      if (!raceData) continue;
+
+      const votes = candidates.map(c => parseFloat(raceData[c]) || 0);
+      if (votes.every(v => v === 0)) continue;
+
+      // Rank the selected candidates by votes descending
+      const indexed = candidates.map((c, i) => ({ c, v: votes[i], i }))
+        .sort((a, b) => b.v - a.v || a.c.localeCompare(b.c));
+
+      const ordering = indexed.map(x => x.i).join('');  // e.g. "021" means c[0] 3rd, c[2] 1st, c[1] 2nd
+      result.set(_norm(jf), { ordering, votes });
+    }
+
+    return result;
+  }
 
   // ── Public API ────────────────────────────────────────────────────────────
 
@@ -464,6 +487,7 @@ const ElectionData = (() => {
     getJurisdictionTotals,
     getTownshipTotals,
     getFilteredGeoJSON,
+    computeOrderingTotals,
     get raw() { return _precincts; },
     get geojson() { return _geojson; },
     loadGeoJSONForRace,

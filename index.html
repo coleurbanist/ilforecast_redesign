@@ -1,181 +1,574 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Maps — Cole's Election Models</title>
-  <link rel="stylesheet" href="styles.css">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
-  <style>
-    .cem-tooltip {
-      background: rgba(13,17,23,0.97) !important;
-      border: 1px solid rgba(255,255,255,0.15) !important;
-      border-radius: 8px !important;
-      color: #e6edf3 !important;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.6) !important;
-      padding: 10px 14px !important;
-    }
-    .cem-tooltip::before { display: none !important; }
-    .leaflet-control-zoom a {
-      background: #1c2330 !important; color: #e6edf3 !important;
-      border-color: rgba(255,255,255,0.1) !important;
-    }
-    .leaflet-control-zoom a:hover { background: #242d3a !important; }
-    .leaflet-control-attribution {
-      background: rgba(13,17,23,0.8) !important;
-      color: #484f58 !important; font-size: 10px !important;
-    }
-    .leaflet-control-attribution a { color: #484f58 !important; }
+/* ============================================================
+   Cole's Election Models — styles.css
+   Dark political data aesthetic
+   ============================================================ */
 
-    #loading-overlay {
-      position: fixed; inset: 0; z-index: 99999;
-      background: var(--bg-base);
-      display: flex; flex-direction: column;
-      align-items: center; justify-content: center; gap: 16px;
-      transition: opacity 0.4s;
-    }
-    #loading-overlay.hidden { opacity: 0; pointer-events: none; }
-    .loading-spinner {
-      width: 36px; height: 36px;
-      border: 3px solid rgba(255,255,255,0.1);
-      border-top-color: var(--accent);
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    .loading-text { color: var(--text-secondary); font-size: 0.875rem; }
-    .loading-sub  { color: var(--text-muted); font-size: 0.775rem; }
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
 
-    .stats-section { margin-top: 16px; }
-    .stats-section-title {
-      font-size: 0.875rem; font-weight: 600;
-      color: var(--text-secondary); margin-bottom: 12px;
-      padding-bottom: 8px; border-bottom: 1px solid var(--border);
-    }
-    .map-legend {
-      display: flex; flex-wrap: wrap; gap: 8px;
-      align-items: center; min-height: 24px;
-    }
-    .legend-item {
-      display: flex; align-items: center; gap: 6px;
-      font-size: 0.775rem; color: var(--text-secondary);
-    }
-    .legend-swatch {
-      width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0;
-    }
-  </style>
-</head>
-<body>
+/* ── CSS Variables ─────────────────────────────────────────── */
+:root {
+  --bg-base:        #0d1117;
+  --bg-surface:     #161b22;
+  --bg-raised:      #1c2330;
+  --bg-highlight:   #242d3a;
 
-<div id="loading-overlay">
-  <div class="loading-spinner"></div>
-  <div class="loading-text">Loading election data…</div>
-  <div class="loading-sub">This may take a moment on first load</div>
-</div>
+  --border:         rgba(255,255,255,0.08);
+  --border-strong:  rgba(255,255,255,0.15);
 
+  --text-primary:   #e6edf3;
+  --text-secondary: #8b949e;
+  --text-muted:     #484f58;
 
+  --accent:         #3b82f6;
+  --accent-hover:   #60a5fa;
+  --accent-glow:    rgba(59,130,246,0.15);
 
-<div class="page-content">
-  <div class="maps-layout">
+  --dem:            #4f93d1;
+  --rep:            #d16f4f;
+  --dem-glow:       rgba(79,147,209,0.2);
+  --rep-glow:       rgba(209,111,79,0.2);
 
-    <aside class="maps-sidebar">
-      <div style="padding:4px 8px 8px">
-        <input id="race-search" type="text" placeholder="Search races…" autocomplete="off"
-          style="width:100%;background:var(--bg-raised);border:1px solid var(--border);
-                 border-radius:6px;padding:7px 10px;color:var(--text-primary);
-                 font-size:0.8rem;font-family:var(--font-body);outline:none;">
-      </div>
-      <div id="race-list"></div>
-    </aside>
+  --nav-height:     56px;
+  --radius:         8px;
+  --radius-lg:      12px;
 
-    <main class="map-main">
+  --font-body:      'DM Sans', sans-serif;
+  --font-mono:      'DM Mono', monospace;
 
-      <div class="map-header">
-        <div id="map-title" class="map-title">Select a race</div>
-        <div id="map-subtitle" class="map-subtitle">Choose a race from the sidebar to get started</div>
-      </div>
+  --shadow-sm:      0 1px 3px rgba(0,0,0,0.4);
+  --shadow-md:      0 4px 16px rgba(0,0,0,0.5);
+  --shadow-lg:      0 8px 32px rgba(0,0,0,0.6);
+}
 
-      <div class="map-controls" id="map-controls" style="display:none">
-        <div class="control-group">
-          <span class="control-label">View</span>
-          <button class="btn-toggle active" data-mode="winner">Winner Map</button>
-          <button class="btn-toggle" data-mode="heat">Heat Map</button>
-          <button class="btn-toggle" data-mode="group">Head to Head</button>
-        </div>
-        <div class="control-group" id="heat-candidate-control" style="display:none">
-          <span class="control-label">Candidate</span>
-          <select id="heat-candidate-select"
-            style="background:var(--bg-raised);border:none;color:var(--text-primary);
-                   font-family:var(--font-body);font-size:0.8rem;padding:4px 8px;
-                   border-radius:5px;cursor:pointer;outline:none;"></select>
-        </div>
-        <div class="control-group" id="geo-filter-control" style="display:none">
-          <span class="control-label">Area</span>
-          <div id="geo-filter-chips" style="display:flex;flex-wrap:wrap;gap:4px;"></div>
-        </div>
-      </div>
+/* ── Reset ─────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-      <div class="map-legend" id="map-legend"></div>
-      <div id="map-container"></div>
+html { scroll-behavior: smooth; }
 
-      <div class="grouping-panel" id="grouping-panel" style="display:none">
-        <h3>Head to Head — Group Candidates</h3>
-        <p>Assign candidates to groups to compare them. Click a chip to cycle it through Group A → Group B → Group C → unassigned.</p>
-        <div class="groups-row" style="grid-template-columns: 1fr 1fr 1fr">
-            <div class="group-box" id="drop-zone-a" ondragover="event.preventDefault()" ondrop="ElectionUI.handleDrop(event,'a')">
-                <div class="group-box-label group-a">Group A</div>
-                <div id="group-a-chips"></div>
-                <div class="text-muted" id="group-a-empty" style="font-size:0.775rem;padding:4px 0">Drop candidates here</div>
-            </div>
-            <div class="group-box" id="drop-zone-b" ondragover="event.preventDefault()" ondrop="ElectionUI.handleDrop(event,'b')">
-                <div class="group-box-label group-b">Group B</div>
-                <div id="group-b-chips"></div>
-                <div class="text-muted" id="group-b-empty" style="font-size:0.775rem;padding:4px 0">Drop candidates here</div>
-            </div>
-            <div class="group-box" id="drop-zone-c" ondragover="event.preventDefault()" ondrop="ElectionUI.handleDrop(event,'c')">
-                <div class="group-box-label group-c">Group C</div>
-                <div id="group-c-chips"></div>
-                <div class="text-muted" id="group-c-empty" style="font-size:0.775rem;padding:4px 0">Drop candidates here</div>
-            </div>
-        </div>
-        <div style="margin-top:14px">
-            <div class="text-muted" style="margin-bottom:6px;font-size:0.775rem">Unassigned — drag to a group or click to assign to Group A</div>
-            <div id="unassigned-chips" style="display:flex;flex-wrap:wrap;gap:4px;min-height:32px;border:1px dashed var(--border);border-radius:6px;padding:4px;" ondragover="event.preventDefault()" ondrop="ElectionUI.handleDrop(event,null)"></div>
-        </div>
-      </div>
+body {
+  font-family: var(--font-body);
+  background-color: var(--bg-base);
+  color: var(--text-primary);
+  min-height: 100vh;
+  font-size: 15px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
 
-      <div class="stats-section" id="stats-section" style="display:none">
-        <div class="stats-section-title" id="stats-title">District-Wide Results</div>
-        <div class="stats-grid" id="stats-grid"></div>
-      </div>
+/* ── Navbar ────────────────────────────────────────────────── */
+#cem-nav {
+  position: sticky;
+  top: 0;
+  z-index: 9999;
+  height: var(--nav-height);
+  background: rgba(13, 17, 23, 0.95);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+}
 
-    </main>
-  </div>
-</div>
+.cem-nav-inner {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 24px;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-<script src="data.js"></script>
-<script src="map.js"></script>
-<script src="ui.js"></script>
-<script src="nav.js"></script>
-<script>
-  const JSON_PATH    = 'data/election_csvs/clean/2026/Primary/2026_primary.json';
-  const GEOJSON_PATH = 'data/election_shapefiles/IL24_slim.geojson';
+.cem-brand {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  text-decoration: none;
+  letter-spacing: -0.2px;
+  margin-right: 16px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.cem-brand span { color: var(--accent); }
 
-  ElectionData.load(JSON_PATH, GEOJSON_PATH)
-    .then(() => {
-      ElectionMap.init('map-container');
-      ElectionUI.init();
-      const overlay = document.getElementById('loading-overlay');
-      overlay.classList.add('hidden');
-      setTimeout(() => overlay.remove(), 500);
-    })
-    .catch(err => {
-      console.error('Failed to load data:', err);
-      document.querySelector('.loading-text').textContent = 'Failed to load data.';
-      document.querySelector('.loading-sub').textContent  = 'Check the browser console for details.';
-    });
-</script>
+/* Desktop menu */
+ul.cem-menu {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: 1;
+}
 
-</body>
-</html>
+ul.cem-menu > li { position: relative; }
+
+ul.cem-menu > li > a,
+ul.cem-menu > li > button {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  font-weight: 500;
+  font-family: var(--font-body);
+  text-decoration: none;
+  background: none;
+  border: none;
+  cursor: pointer;
+  border-radius: var(--radius);
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+
+ul.cem-menu > li > a:hover,
+ul.cem-menu > li > button:hover,
+ul.cem-menu > li.cem-open > button {
+  background: var(--bg-highlight);
+  color: var(--text-primary);
+}
+
+/* Chevron */
+.cem-chevron {
+  width: 13px; height: 13px;
+  transition: transform 0.2s;
+  opacity: 0.5;
+  flex-shrink: 0;
+}
+li.cem-open .cem-chevron { transform: rotate(180deg); opacity: 1; }
+
+/* Dropdown */
+.cem-dropdown {
+  display: none;
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  min-width: 240px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+  z-index: 10000;
+}
+li.cem-open .cem-dropdown {
+  display: block;
+  animation: fadeDown 0.15s ease;
+}
+@keyframes fadeDown {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.cem-dropdown a {
+  display: block;
+  padding: 10px 16px;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  text-decoration: none;
+  transition: background 0.1s, color 0.1s;
+  border-bottom: 1px solid var(--border);
+}
+.cem-dropdown a:last-child { border-bottom: none; }
+.cem-dropdown a:hover {
+  background: var(--bg-highlight);
+  color: var(--text-primary);
+}
+
+/* Hamburger */
+.cem-hamburger {
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  width: 36px; height: 36px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: var(--radius);
+  margin-left: auto;
+}
+.cem-hamburger:hover { background: var(--bg-highlight); }
+.cem-hamburger span {
+  display: block;
+  height: 2px;
+  background: var(--text-secondary);
+  border-radius: 2px;
+  transition: transform 0.25s, opacity 0.25s;
+}
+.cem-hamburger.cem-open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+.cem-hamburger.cem-open span:nth-child(2) { opacity: 0; }
+.cem-hamburger.cem-open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+
+/* Mobile menu */
+.cem-mobile-menu {
+  display: none;
+  flex-direction: column;
+  background: var(--bg-surface);
+  border-top: 1px solid var(--border);
+  overflow: hidden;
+  max-height: 0;
+  transition: max-height 0.3s ease;
+}
+.cem-mobile-menu.cem-open { display: flex; max-height: 80vh; overflow-y: auto; }
+.cem-mobile-menu a,
+.cem-mobile-menu button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 13px 24px;
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+  text-decoration: none;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  font-family: var(--font-body);
+  width: 100%;
+  text-align: left;
+}
+.cem-mobile-menu a:hover,
+.cem-mobile-menu button:hover { background: var(--bg-highlight); color: var(--text-primary); }
+.cem-mobile-sub { display: none; flex-direction: column; background: var(--bg-base); }
+.cem-mobile-sub.cem-open { display: flex; }
+.cem-mobile-sub a { padding-left: 40px; font-size: 0.875rem; }
+
+@media (max-width: 768px) {
+  ul.cem-menu { display: none; }
+  .cem-hamburger { display: flex; }
+}
+
+/* ── Page layout ───────────────────────────────────────────── */
+.page-content {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 32px 24px;
+}
+
+/* ── Cards / surfaces ──────────────────────────────────────── */
+.card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+}
+
+.card-title {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  margin-bottom: 16px;
+}
+
+/* ── Map page layout ───────────────────────────────────────── */
+.maps-layout {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  grid-template-rows: auto;
+  gap: 16px;
+  align-items: start;
+}
+
+@media (max-width: 960px) {
+  .maps-layout { grid-template-columns: 1fr; }
+}
+
+/* Sidebar */
+.maps-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  position: sticky;
+  top: calc(var(--nav-height) + 16px);
+  max-height: calc(100vh - var(--nav-height) - 32px);
+  overflow-y: auto;
+}
+
+.sidebar-section-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  padding: 8px 12px 4px;
+}
+
+.sidebar-race-btn {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 9px 12px;
+  background: none;
+  border: none;
+  border-radius: var(--radius);
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  font-family: var(--font-body);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+  line-height: 1.4;
+}
+.sidebar-race-btn:hover { background: var(--bg-highlight); color: var(--text-primary); }
+.sidebar-race-btn.active {
+  background: var(--accent-glow);
+  color: var(--accent-hover);
+  font-weight: 500;
+}
+.sidebar-race-btn .party-dot {
+  display: inline-block;
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  margin-right: 7px;
+  flex-shrink: 0;
+  vertical-align: middle;
+  position: relative;
+  top: -1px;
+}
+.party-dot.dem { background: var(--dem); }
+.party-dot.rep { background: var(--rep); }
+
+/* Map main area */
+.map-main { display: flex; flex-direction: column; gap: 16px; }
+
+.map-header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.map-title {
+  font-size: 1.4rem;
+  font-weight: 600;
+  letter-spacing: -0.3px;
+  color: var(--text-primary);
+}
+
+.map-subtitle {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+/* Map controls toolbar */
+.map-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.control-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 4px 6px;
+}
+
+.control-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  padding: 0 4px;
+}
+
+.btn-toggle {
+  padding: 5px 12px;
+  font-size: 0.8rem;
+  font-family: var(--font-body);
+  font-weight: 500;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  background: none;
+  color: var(--text-secondary);
+  transition: background 0.12s, color 0.12s;
+}
+.btn-toggle:hover { background: var(--bg-highlight); color: var(--text-primary); }
+.btn-toggle.active { background: var(--accent); color: #fff; }
+
+/* Map container */
+#map-container {
+  width: 100%;
+  height: 600px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  position: relative;
+}
+
+/* Candidate grouping panel */
+.grouping-panel {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+}
+
+.grouping-panel h3 {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.grouping-panel p {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-bottom: 16px;
+}
+
+.groups-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+@media (max-width: 640px) {
+  .groups-row { grid-template-columns: 1fr; }
+}
+
+.group-box {
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px;
+}
+
+.group-box-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 10px;
+}
+.group-box-label.group-a { color: var(--dem); }
+.group-box-label.group-b { color: var(--rep); }
+.group-box-label.group-c { color: #2ecc71; }
+.candidate-chip.selected-c {
+  background: rgba(46,204,113,0.15);
+  border-color: #2ecc71;
+  color: #2ecc71;
+}
+
+.candidate-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  margin: 3px;
+  background: var(--bg-highlight);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.12s;
+  user-select: none;
+}
+.candidate-chip:hover { border-color: var(--border-strong); color: var(--text-primary); }
+.candidate-chip.selected-a {
+  background: var(--dem-glow);
+  border-color: var(--dem);
+  color: var(--dem);
+}
+.candidate-chip.selected-b {
+  background: var(--rep-glow);
+  border-color: var(--rep);
+  color: var(--rep);
+}
+
+/* Geographic filter */
+.geo-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.geo-filter-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-right: 4px;
+}
+
+.geo-chip {
+  padding: 4px 10px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  font-size: 0.775rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.12s;
+}
+.geo-chip:hover { border-color: var(--border-strong); color: var(--text-primary); }
+.geo-chip.active {
+  background: var(--accent-glow);
+  border-color: var(--accent);
+  color: var(--accent-hover);
+}
+
+/* ── Stats tables ───────────────────────────────────────────── */
+.stats-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.stats-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.stats-table thead th {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-muted);
+  padding: 8px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+
+.stats-table tbody tr {
+  border-bottom: 1px solid var(--border);
+  transition: background 0.1s;
+}
+.stats-table tbody tr:last-child { border-bottom: none; }
+.stats-table tbody tr:hover { background: var(--bg-highlight); }
+
+.stats-table td {
+  padding: 10px 12px;
+  color: var(--text-primary);
+}
+
+.stats-table td.num {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  text-align: right;
+  color: var(--text-secondary);
+}
+
+.candidate-color-bar {
+  display: inline-block;
+  width: 3px;
+  height: 14px;
+  border-radius: 2px;
+  margin-right: 8px;
+  vertical-align: middle;
+}
+
+/* ── Utility ────────────────────────────────────────────────── */
+.divider {
+  height: 1px;
+  background: var(--border);
+  margin: 8px 0;
+}
+
+.text-muted { color: var(--text-muted); font-size: 0.8rem; }
+.text-mono  { font-family: var(--font-mono); }

@@ -7,14 +7,15 @@
 
 const ElectionUI = (() => {
 
-  let _currentRace = null;
-  let _currentMode = 'winner';
-  let _currentCandidates = [];
-  let _groupA = [];
-  let _groupB = [];
-  let _groupC = [];
+  let _currentRace        = null;
+  let _currentMode        = 'winner';
+  let _currentCandidates  = [];
+  let _groupA             = [];
+  let _groupB             = [];
+  let _groupC             = [];
+  let _orderingCandidates = [];
   let _currentJurisdictions = null;
-  let _allJurisdictions = [];
+  let _allJurisdictions   = [];
 
   // ── Init ──────────────────────────────────────────────────────────────────
 
@@ -27,8 +28,8 @@ const ElectionUI = (() => {
   // ── Race sidebar ──────────────────────────────────────────────────────────
 
   function _buildRaceList(filter = '') {
-    const races  = ElectionData.getRaces();
-    const list   = document.getElementById('race-list');
+    const races = ElectionData.getRaces();
+    const list  = document.getElementById('race-list');
     list.innerHTML = '';
 
     const grouped = {};
@@ -48,7 +49,6 @@ const ElectionUI = (() => {
 
     for (const key of sortedKeys) {
       const { party, category, races: raceList } = grouped[key];
-
       const label = document.createElement('div');
       label.className = 'sidebar-section-label';
       label.textContent = `${party} — ${category}`;
@@ -58,12 +58,10 @@ const ElectionUI = (() => {
         const btn = document.createElement('button');
         btn.className = 'sidebar-race-btn';
         btn.dataset.race = r.raceName;
-
         const dot = document.createElement('span');
         dot.className = `party-dot ${r.party === 'Democrat' ? 'dem' : 'rep'}`;
         btn.appendChild(dot);
         btn.appendChild(document.createTextNode(_formatRaceName(r.raceName)));
-
         if (r.raceName === _currentRace) btn.classList.add('active');
         btn.addEventListener('click', () => _selectRace(r.raceName));
         list.appendChild(btn);
@@ -91,11 +89,12 @@ const ElectionUI = (() => {
   // ── Race selection ────────────────────────────────────────────────────────
 
   function _selectRace(raceName) {
-    _currentRace = raceName;
-    _currentMode = 'winner';
-    _groupA = [];
-    _groupB = [];
-    _groupC = [];
+    _currentRace        = raceName;
+    _currentMode        = 'winner';
+    _groupA             = [];
+    _groupB             = [];
+    _groupC             = [];
+    _orderingCandidates = [];
     _currentJurisdictions = null;
 
     _currentCandidates = ElectionData.getCandidates(raceName);
@@ -113,16 +112,20 @@ const ElectionUI = (() => {
     document.getElementById('map-controls').style.display = 'flex';
     document.getElementById('stats-section').style.display = 'block';
 
-    // Reset mode-specific UI elements
+    // Reset mode-specific UI
     document.getElementById('heat-candidate-control').style.display = 'none';
     document.getElementById('grouping-panel').style.display = 'none';
-    document.getElementById('map-controls').style.display = 'flex';
+    const orderingPanel = document.getElementById('ordering-panel');
+    if (orderingPanel) orderingPanel.style.display = 'none';
 
     // Reset mode buttons
     document.querySelectorAll('[data-mode]').forEach(b => b.classList.remove('active'));
     document.querySelector('[data-mode="winner"]').classList.add('active');
+
     _buildHeatCandidateSelect();
     _buildGeoFilter();
+    _updateModeButtons();
+    _buildOrderingPanel();
     ElectionMap.render(raceName, 'winner');
     _buildLegend();
     _buildStatsTable();
@@ -145,11 +148,13 @@ const ElectionUI = (() => {
   }
 
   function _applyMode() {
-    const heatControl = document.getElementById('heat-candidate-control');
-    const groupPanel  = document.getElementById('grouping-panel');
+    const heatControl   = document.getElementById('heat-candidate-control');
+    const groupPanel    = document.getElementById('grouping-panel');
+    const orderingPanel = document.getElementById('ordering-panel');
 
-    heatControl.style.display = _currentMode === 'heat'  ? 'flex'  : 'none';
-    groupPanel.style.display  = _currentMode === 'group' ? 'block' : 'none';
+    heatControl.style.display   = _currentMode === 'heat'     ? 'flex'  : 'none';
+    groupPanel.style.display    = _currentMode === 'group'    ? 'block' : 'none';
+    if (orderingPanel) orderingPanel.style.display = _currentMode === 'ordering' ? 'block' : 'none';
 
     if (_currentMode === 'winner') {
       ElectionMap.render(_currentRace, 'winner', { jurisdictions: _currentJurisdictions });
@@ -167,9 +172,26 @@ const ElectionUI = (() => {
         });
         _buildGroupLegend();
       }
+    } else if (_currentMode === 'ordering') {
+      if (_orderingCandidates.length >= 2) {
+        ElectionMap.render(_currentRace, 'ordering', {
+          candidates: _orderingCandidates, jurisdictions: _currentJurisdictions,
+        });
+        _buildOrderingLegend();
+      }
     }
 
     _buildStatsTable();
+  }
+
+  function _updateModeButtons() {
+    const n           = _currentCandidates.length;
+    const heatBtn     = document.querySelector('[data-mode="heat"]');
+    const groupBtn    = document.querySelector('[data-mode="group"]');
+    const orderingBtn = document.getElementById('btn-ordering');
+    if (heatBtn)     heatBtn.style.display     = n >= 3 ? '' : 'none';
+    if (groupBtn)    groupBtn.style.display    = n >= 3 ? '' : 'none';
+    if (orderingBtn) orderingBtn.style.display = n >= 3 ? '' : 'none';
   }
 
   // ── Heat candidate picker ─────────────────────────────────────────────────
@@ -184,9 +206,7 @@ const ElectionUI = (() => {
       opt.textContent = c;
       sel.appendChild(opt);
     }
-    sel.onchange = () => {
-      if (_currentMode === 'heat') _applyMode();
-    };
+    sel.onchange = () => { if (_currentMode === 'heat') _applyMode(); };
   }
 
   // ── Geographic filter ─────────────────────────────────────────────────────
@@ -196,10 +216,7 @@ const ElectionUI = (() => {
     const chips = document.getElementById('geo-filter-chips');
     if (!ctrl || !chips) return;
 
-    if (_allJurisdictions.length <= 1) {
-      ctrl.style.display = 'none';
-      return;
-    }
+    if (_allJurisdictions.length <= 1) { ctrl.style.display = 'none'; return; }
 
     ctrl.style.display = 'flex';
     chips.innerHTML = '';
@@ -285,15 +302,12 @@ const ElectionUI = (() => {
     event.preventDefault();
     const name = event.dataTransfer.getData('text/plain');
     if (!name) return;
-
     _groupA = _groupA.filter(c => c !== name);
     _groupB = _groupB.filter(c => c !== name);
     _groupC = _groupC.filter(c => c !== name);
-
     if (targetGroup === 'a')      _groupA.push(name);
     else if (targetGroup === 'b') _groupB.push(name);
     else if (targetGroup === 'c') _groupC.push(name);
-
     _updateGroupingPanel();
     _rerenderGroup();
   }
@@ -309,6 +323,92 @@ const ElectionUI = (() => {
     }
   }
 
+  // ── Ordering panel ────────────────────────────────────────────────────────
+
+  function _buildOrderingPanel() {
+    const selected  = document.getElementById('ordering-selected');
+    const available = document.getElementById('ordering-available');
+    if (!selected || !available) return;
+    selected.innerHTML  = '';
+    available.innerHTML = '';
+
+    for (const c of _orderingCandidates) {
+      selected.appendChild(_makeOrderingChip(c, true));
+    }
+    for (const c of _currentCandidates) {
+      if (!_orderingCandidates.includes(c)) {
+        available.appendChild(_makeOrderingChip(c, false));
+      }
+    }
+  }
+
+  function _makeOrderingChip(name, isSelected) {
+    const chip = document.createElement('span');
+    chip.className = `candidate-chip${isSelected ? ' selected-a' : ''}`;
+    if (isSelected) {
+      chip.style.background  = `${ElectionMap.getCandidateColor(name)}33`;
+      chip.style.borderColor = ElectionMap.getCandidateColor(name);
+      chip.style.color       = ElectionMap.getCandidateColor(name);
+    }
+    chip.textContent = name;
+    chip.draggable = isSelected;
+
+    if (isSelected) {
+      chip.addEventListener('click', () => {
+        _orderingCandidates = _orderingCandidates.filter(c => c !== name);
+        _buildOrderingPanel();
+        if (_currentMode === 'ordering') _applyMode();
+      });
+      chip.addEventListener('dragstart', e => {
+        e.dataTransfer.setData('text/plain', name);
+        e.dataTransfer.effectAllowed = 'move';
+      });
+    } else {
+      chip.addEventListener('click', () => {
+        if (_orderingCandidates.length >= 3) return;
+        _orderingCandidates.push(name);
+        _buildOrderingPanel();
+        if (_currentMode === 'ordering') _applyMode();
+      });
+    }
+    return chip;
+  }
+
+function _buildOrderingLegend() {
+    const legend = document.getElementById('map-legend');
+    if (!legend || !_orderingCandidates.length) return;
+    legend.innerHTML = '';
+
+    const n = _orderingCandidates.length;
+    const perms = n === 2
+      ? [[0,1],[1,0]]
+      : [[0,1,2],[0,2,1],[1,0,2],[1,2,0],[2,0,1],[2,1,0]];
+
+    // Group perms by leader index so each leader's pair sits on the same row
+    const byLeader = {};
+    for (const perm of perms) {
+      const leader = perm[0];
+      if (!byLeader[leader]) byLeader[leader] = [];
+      byLeader[leader].push(perm);
+    }
+
+    const leaderOrder = [...new Set(perms.map(p => p[0]))];
+    for (const leader of leaderOrder) {
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:4px;';
+      for (const perm of byLeader[leader]) {
+        const ordering = perm.join('');
+        const color    = ElectionMap._getOrderingColor(ordering, _orderingCandidates);
+        const label    = perm.map(i => _orderingCandidates[i]).join(' → ');
+        const item     = document.createElement('div');
+        item.className = 'legend-item';
+        item.innerHTML = `<span class="legend-swatch" style="background:${color}"></span>${label}`;
+        row.appendChild(item);
+      }
+      legend.appendChild(row);
+    }
+  }
+
   // ── Legends ───────────────────────────────────────────────────────────────
 
   function _buildLegend() {
@@ -318,10 +418,7 @@ const ElectionUI = (() => {
     for (const c of _currentCandidates) {
       const item = document.createElement('div');
       item.className = 'legend-item';
-      item.innerHTML = `
-        <span class="legend-swatch" style="background:${ElectionMap.getCandidateColor(c)}"></span>
-        ${c}
-      `;
+      item.innerHTML = `<span class="legend-swatch" style="background:${ElectionMap.getCandidateColor(c)}"></span>${c}`;
       legend.appendChild(item);
     }
   }
@@ -330,15 +427,9 @@ const ElectionUI = (() => {
     const legend = document.getElementById('map-legend');
     if (!legend) return;
     legend.innerHTML = `
-      <div class="legend-item">
-        <span class="legend-swatch" style="background:#d16f4f"></span> Below district average
-      </div>
-      <div class="legend-item">
-        <span class="legend-swatch" style="background:#1c2330"></span> At average
-      </div>
-      <div class="legend-item">
-        <span class="legend-swatch" style="background:#4f93d1"></span> Above district average
-      </div>
+      <div class="legend-item"><span class="legend-swatch" style="background:#d16f4f"></span> Below district average</div>
+      <div class="legend-item"><span class="legend-swatch" style="background:#1c2330"></span> At average</div>
+      <div class="legend-item"><span class="legend-swatch" style="background:#4f93d1"></span> Above district average</div>
       <span class="text-muted" style="margin-left:4px">— ${candidate}</span>
     `;
   }
@@ -350,12 +441,8 @@ const ElectionUI = (() => {
     const bLabel = _groupB.join(' + ') || 'Group B';
     const cLabel = _groupC.join(' + ');
     legend.innerHTML = `
-      <div class="legend-item">
-        <span class="legend-swatch" style="background:#4f93d1"></span> ${aLabel}
-      </div>
-      <div class="legend-item">
-        <span class="legend-swatch" style="background:#d16f4f"></span> ${bLabel}
-      </div>
+      <div class="legend-item"><span class="legend-swatch" style="background:#4f93d1"></span> ${aLabel}</div>
+      <div class="legend-item"><span class="legend-swatch" style="background:#d16f4f"></span> ${bLabel}</div>
       ${cLabel ? `<div class="legend-item"><span class="legend-swatch" style="background:#2ecc71"></span> ${cLabel}</div>` : ''}
     `;
   }
@@ -366,7 +453,6 @@ const ElectionUI = (() => {
     const grid = document.getElementById('stats-grid');
     if (!grid || !_currentRace) return;
     grid.innerHTML = '';
-
     if (_currentMode === 'group' && (_groupA.length || _groupB.length || _groupC.length)) {
       _buildGroupStatsTable(grid);
     } else {
@@ -379,7 +465,6 @@ const ElectionUI = (() => {
     const { candidates, totalVoters } = ElectionData.getDistrictTotals(_currentRace, _currentJurisdictions);
     const sorted = Object.entries(candidates).sort((a, b) => b[1] - a[1]);
 
-    // Merge precincts-won across all jurisdictions
     const jurWon = ElectionData.getJurisdictionTotals(_currentRace, _currentJurisdictions);
     const districtWonMerged = { won: {}, ties: 0 };
     for (const jur of Object.values(jurWon)) {
@@ -389,28 +474,24 @@ const ElectionUI = (() => {
     }
     const totalPrecincts = Object.values(districtWonMerged.won).reduce((s, v) => s + v, 0);
 
-    const card = document.createElement('div');
+    const card    = document.createElement('div');
     card.className = 'card';
-
-    const titleEl = document.createElement('div');
+    const titleEl  = document.createElement('div');
     titleEl.className = 'card-title';
+    const isStatewide = ElectionData.getRaces().find(r => r.raceName === _currentRace)?.category === 'Statewide';
     titleEl.textContent = _currentJurisdictions
       ? `Results — ${_currentJurisdictions.join(', ')}`
-      : 'District-Wide Vote Totals';
+      : isStatewide ? 'Chicagoland Vote Totals' : 'District-Wide Vote Totals';
     card.appendChild(titleEl);
 
     const table = document.createElement('table');
     table.className = 'stats-table';
-    table.innerHTML = `
-      <thead>
-        <tr>
-          <th>Candidate</th>
-          <th style="text-align:right">Precincts Won</th>
-          <th style="text-align:right">Votes</th>
-          <th style="text-align:right">Share</th>
-        </tr>
-      </thead>
-    `;
+    table.innerHTML = `<thead><tr>
+      <th>Candidate</th>
+      <th style="text-align:right">Precincts Won</th>
+      <th style="text-align:right">Votes</th>
+      <th style="text-align:right">Share</th>
+    </tr></thead>`;
 
     const tbody = document.createElement('tbody');
     for (const [name, votes] of sorted) {
@@ -418,18 +499,15 @@ const ElectionUI = (() => {
       const color  = ElectionMap.getCandidateColor(name);
       const pw     = districtWonMerged.won[name] || 0;
       const pwPct  = totalPrecincts > 0 ? ((pw / totalPrecincts) * 100).toFixed(1) : '—';
-      const tr = document.createElement('tr');
+      const tr     = document.createElement('tr');
       tr.innerHTML = `
-        <td style="white-space:nowrap">
-          <span class="candidate-color-bar" style="background:${color}"></span>${name}
-        </td>
+        <td style="white-space:nowrap"><span class="candidate-color-bar" style="background:${color}"></span>${name}</td>
         <td class="num">${pw} (${pwPct}%)</td>
         <td class="num">${votes.toLocaleString()}</td>
         <td class="num">${share}%</td>
       `;
       tbody.appendChild(tr);
     }
-
     const totalTr = document.createElement('tr');
     totalTr.innerHTML = `
       <td style="font-weight:600">Total</td>
@@ -440,7 +518,6 @@ const ElectionUI = (() => {
     tbody.appendChild(totalTr);
     table.appendChild(tbody);
     card.appendChild(table);
-
     if (districtWonMerged.ties > 0) {
       const tieNote = document.createElement('div');
       tieNote.className = 'text-muted';
@@ -448,30 +525,22 @@ const ElectionUI = (() => {
       tieNote.textContent = `* ${districtWonMerged.ties} precinct(s) tied — counted for all tied candidates`;
       card.appendChild(tieNote);
     }
-
     grid.appendChild(card);
   }
 
   function _buildGroupStatsTable(grid) {
     const { candidates } = ElectionData.getDistrictTotals(_currentRace, _currentJurisdictions);
-
     const groups = [
       { label: _groupA.join(' + ') || 'Group A', members: _groupA, color: '#4f93d1', key: '__groupA' },
       { label: _groupB.join(' + ') || 'Group B', members: _groupB, color: '#d16f4f', key: '__groupB' },
       { label: _groupC.join(' + ') || 'Group C', members: _groupC, color: '#2ecc71', key: '__groupC' },
     ].filter(g => g.members.length > 0);
-
     const groupTotals = groups.map(g => ({
-      ...g,
-      votes: g.members.reduce((sum, c) => sum + (candidates[c] || 0), 0),
+      ...g, votes: g.members.reduce((sum, c) => sum + (candidates[c] || 0), 0),
     }));
-
     const combined = groupTotals.reduce((sum, g) => sum + g.votes, 0);
 
-    // Precincts won per group
-    const groupWonData = ElectionData.getJurisdictionTotals(
-      _currentRace, _currentJurisdictions, _groupA, _groupB, _groupC
-    );
+    const groupWonData = ElectionData.getJurisdictionTotals(_currentRace, _currentJurisdictions, _groupA, _groupB, _groupC);
     const groupWonMerged = { won: {}, ties: 0 };
     for (const jur of Object.values(groupWonData)) {
       for (const [k, v] of Object.entries(jur.won || {}))
@@ -480,46 +549,39 @@ const ElectionUI = (() => {
     }
     const totalGPrecincts = Object.values(groupWonMerged.won).reduce((s, v) => s + v, 0);
 
-    const card = document.createElement('div');
+    const card    = document.createElement('div');
     card.className = 'card';
-
-    const titleEl = document.createElement('div');
+    const titleEl  = document.createElement('div');
     titleEl.className = 'card-title';
+    const isStatewide = ElectionData.getRaces().find(r => r.raceName === _currentRace)?.category === 'Statewide';
     titleEl.textContent = _currentJurisdictions
       ? `Head to Head — ${_currentJurisdictions.join(', ')}`
-      : 'Head to Head — District-Wide';
+      : isStatewide ? 'Head to Head — Chicagoland' : 'Head to Head — District-Wide';
     card.appendChild(titleEl);
 
     const table = document.createElement('table');
     table.className = 'stats-table';
-    table.innerHTML = `
-      <thead>
-        <tr>
-          <th>Group</th>
-          <th style="text-align:right">Precincts Won</th>
-          <th style="text-align:right">Votes</th>
-          <th style="text-align:right">Share</th>
-        </tr>
-      </thead>
-    `;
+    table.innerHTML = `<thead><tr>
+      <th>Group</th>
+      <th style="text-align:right">Precincts Won</th>
+      <th style="text-align:right">Votes</th>
+      <th style="text-align:right">Share</th>
+    </tr></thead>`;
 
     const tbody = document.createElement('tbody');
     for (const g of groupTotals) {
       const share  = combined > 0 ? ((g.votes / combined) * 100).toFixed(1) : '—';
       const gpw    = groupWonMerged.won[g.key] || 0;
       const gpwPct = totalGPrecincts > 0 ? ((gpw / totalGPrecincts) * 100).toFixed(1) : '—';
-      const tr = document.createElement('tr');
+      const tr     = document.createElement('tr');
       tr.innerHTML = `
-        <td style="white-space:nowrap">
-          <span class="candidate-color-bar" style="background:${g.color}"></span>${g.label}
-        </td>
+        <td style="white-space:nowrap"><span class="candidate-color-bar" style="background:${g.color}"></span>${g.label}</td>
         <td class="num">${gpw} (${gpwPct}%)</td>
         <td class="num">${g.votes.toLocaleString()}</td>
         <td class="num">${share}%</td>
       `;
       tbody.appendChild(tr);
     }
-
     const totalTr = document.createElement('tr');
     totalTr.innerHTML = `
       <td style="font-weight:600">Combined</td>
@@ -530,7 +592,6 @@ const ElectionUI = (() => {
     tbody.appendChild(totalTr);
     table.appendChild(tbody);
     card.appendChild(table);
-
     if (groupWonMerged.ties > 0) {
       const tieNote = document.createElement('div');
       tieNote.className = 'text-muted';
@@ -538,7 +599,6 @@ const ElectionUI = (() => {
       tieNote.textContent = `* ${groupWonMerged.ties} precinct(s) tied — counted for all tied groups`;
       card.appendChild(tieNote);
     }
-
     grid.appendChild(card);
   }
 
@@ -557,14 +617,12 @@ const ElectionUI = (() => {
       const bi = JURISDICTION_ORDER.indexOf(b.toUpperCase());
       return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
     });
-
     if (sortedJurs.length === 0) return;
 
-    // ── Jurisdiction summary table ──
+    // ── Jurisdiction table ──
     const jurCard = document.createElement('div');
     jurCard.className = 'card';
     jurCard.style.marginTop = '16px';
-
     const jurTitle = document.createElement('div');
     jurTitle.className = 'card-title';
     jurTitle.textContent = 'Results by Jurisdiction';
@@ -572,18 +630,13 @@ const ElectionUI = (() => {
 
     const jurTable = document.createElement('table');
     jurTable.className = 'stats-table';
-    jurTable.innerHTML = `
-      <thead>
-        <tr>
-          <th>Jurisdiction</th>
-          <th>${isGroup ? 'Group' : 'Candidate'}</th>
-          <th style="text-align:right">Precincts Won</th>
-          <th style="text-align:right">Votes</th>
-          <th style="text-align:right">Share</th>
-        </tr>
-      </thead>
-    `;
-
+    jurTable.innerHTML = `<thead><tr>
+      <th>Jurisdiction</th>
+      <th>${isGroup ? 'Group' : 'Candidate'}</th>
+      <th style="text-align:right">Precincts Won</th>
+      <th style="text-align:right">Votes</th>
+      <th style="text-align:right">Share</th>
+    </tr></thead>`;
     const jurTbody = document.createElement('tbody');
 
     for (const jur of sortedJurs) {
@@ -596,10 +649,8 @@ const ElectionUI = (() => {
           { label: _groupB.join(' + ') || 'Group B', key: '__groupB', color: '#d16f4f', members: _groupB },
           { label: _groupC.join(' + ') || 'Group C', key: '__groupC', color: '#2ecc71', members: _groupC },
         ].filter(g => g.members.length > 0);
-
         const combined = groups.reduce((s, g) =>
           s + g.members.reduce((ss, c) => ss + (d.candidates[c] || 0), 0), 0);
-
         groups.forEach((g, gi) => {
           const votes  = g.members.reduce((s, c) => s + (d.candidates[c] || 0), 0);
           const share  = combined > 0 ? ((votes / combined) * 100).toFixed(1) : '—';
@@ -638,7 +689,6 @@ const ElectionUI = (() => {
           jurTbody.appendChild(tieRow);
         }
       }
-
       const divRow = document.createElement('tr');
       divRow.innerHTML = `<td colspan="5" style="padding:0;border-bottom:1px solid var(--border-strong)"></td>`;
       jurTbody.appendChild(divRow);
@@ -652,7 +702,6 @@ const ElectionUI = (() => {
     const wtCard = document.createElement('div');
     wtCard.className = 'card';
     wtCard.style.marginTop = '16px';
-
     const wtTitle = document.createElement('div');
     wtTitle.className = 'card-title';
     wtTitle.textContent = 'Results by Ward / Township';
@@ -660,11 +709,7 @@ const ElectionUI = (() => {
 
     for (const jur of sortedJurs) {
       const jurHeader = document.createElement('div');
-      jurHeader.style.cssText = `
-        display:flex;align-items:center;gap:8px;padding:10px 12px;
-        cursor:pointer;border-radius:6px;user-select:none;
-        transition:background 0.12s;
-      `;
+      jurHeader.style.cssText = `display:flex;align-items:center;gap:8px;padding:10px 12px;cursor:pointer;border-radius:6px;user-select:none;transition:background 0.12s;`;
       jurHeader.innerHTML = `
         <span class="jur-chevron" style="font-size:0.7rem;color:var(--text-muted);transition:transform 0.2s">▶</span>
         <span style="font-weight:500;font-size:0.875rem">${jur}</span>
@@ -688,7 +733,6 @@ const ElectionUI = (() => {
       wtCard.appendChild(jurHeader);
       wtCard.appendChild(wtContent);
     }
-
     grid.appendChild(wtCard);
   }
 
@@ -697,7 +741,6 @@ const ElectionUI = (() => {
       _currentRace, jurisdiction,
       isGroup ? _groupA : [], isGroup ? _groupB : [], isGroup ? _groupC : []
     );
-
     const sortedTownships = Object.keys(twData).sort((a, b) => {
       const na = parseInt(a), nb = parseInt(b);
       if (!isNaN(na) && !isNaN(nb)) return na - nb;
@@ -709,12 +752,7 @@ const ElectionUI = (() => {
       const totalPrecincts = Object.values(d.won || {}).reduce((s, v) => s + v, 0);
 
       const twHeader = document.createElement('div');
-      twHeader.style.cssText = `
-        display:flex;align-items:center;gap:8px;padding:8px 12px;
-        cursor:pointer;border-radius:6px;user-select:none;
-        border-bottom:1px solid var(--border);
-        transition:background 0.12s;
-      `;
+      twHeader.style.cssText = `display:flex;align-items:center;gap:8px;padding:8px 12px;cursor:pointer;border-radius:6px;user-select:none;border-bottom:1px solid var(--border);transition:background 0.12s;`;
       twHeader.innerHTML = `
         <span class="tw-chevron" style="font-size:0.65rem;color:var(--text-muted);transition:transform 0.2s">▶</span>
         <span style="font-size:0.825rem;color:var(--text-secondary)">${township}</span>
@@ -736,16 +774,12 @@ const ElectionUI = (() => {
       const twTable = document.createElement('table');
       twTable.className = 'stats-table';
       twTable.style.marginTop = '4px';
-      twTable.innerHTML = `
-        <thead>
-          <tr>
-            <th>${isGroup ? 'Group' : 'Candidate'}</th>
-            <th style="text-align:right">Precincts Won</th>
-            <th style="text-align:right">Votes</th>
-            <th style="text-align:right">Share</th>
-          </tr>
-        </thead>
-      `;
+      twTable.innerHTML = `<thead><tr>
+        <th>${isGroup ? 'Group' : 'Candidate'}</th>
+        <th style="text-align:right">Precincts Won</th>
+        <th style="text-align:right">Votes</th>
+        <th style="text-align:right">Share</th>
+      </tr></thead>`;
       const twTbody = document.createElement('tbody');
 
       if (isGroup) {

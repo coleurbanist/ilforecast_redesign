@@ -260,6 +260,37 @@ li.cem-open .cem-dropdown {
   margin-bottom: 16px;
 }
 
+/* ── Sidebar toggle button (hidden on desktop) ─────────────── */
+.sidebar-toggle-btn {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: var(--accent);
+  border: none;
+  border-radius: var(--radius);
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 600;
+  font-family: var(--font-body);
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: background 0.12s;
+}
+.sidebar-toggle-btn:hover { background: var(--accent-hover); }
+
+/* ── Sidebar overlay ───────────────────────────────────────── */
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  top: var(--nav-height);
+  background: rgba(0,0,0,0.5);
+  z-index: 998;
+}
+.sidebar-overlay.active { display: block; }
+
 /* ── Map page layout ───────────────────────────────────────── */
 .maps-layout {
   display: grid;
@@ -269,11 +300,7 @@ li.cem-open .cem-dropdown {
   align-items: start;
 }
 
-@media (max-width: 960px) {
-  .maps-layout { grid-template-columns: 1fr; }
-}
-
-/* Sidebar */
+/* ── Sidebar ───────────────────────────────────────────────── */
 .maps-sidebar {
   display: flex;
   flex-direction: column;
@@ -327,14 +354,10 @@ li.cem-open .cem-dropdown {
 .party-dot.dem { background: var(--dem); }
 .party-dot.rep { background: var(--rep); }
 
-/* Map main area */
+/* ── Map main area ─────────────────────────────────────────── */
 .map-main { display: flex; flex-direction: column; gap: 16px; }
 
-.map-header {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
+.map-header { display: flex; flex-direction: column; gap: 6px; }
 
 .map-title {
   font-size: 1.4rem;
@@ -348,7 +371,7 @@ li.cem-open .cem-dropdown {
   color: var(--text-secondary);
 }
 
-/* Map controls toolbar */
+/* ── Map controls toolbar ──────────────────────────────────── */
 .map-controls {
   display: flex;
   flex-wrap: wrap;
@@ -388,7 +411,7 @@ li.cem-open .cem-dropdown {
 .btn-toggle:hover { background: var(--bg-highlight); color: var(--text-primary); }
 .btn-toggle.active { background: var(--accent); color: #fff; }
 
-/* Map container */
+/* ── Map container ─────────────────────────────────────────── */
 #map-container {
   width: 100%;
   height: 600px;
@@ -399,7 +422,7 @@ li.cem-open .cem-dropdown {
   position: relative;
 }
 
-/* Candidate grouping panel */
+/* ── Candidate grouping panel ──────────────────────────────── */
 .grouping-panel {
   background: var(--bg-surface);
   border: 1px solid var(--border);
@@ -447,11 +470,6 @@ li.cem-open .cem-dropdown {
 .group-box-label.group-a { color: var(--dem); }
 .group-box-label.group-b { color: var(--rep); }
 .group-box-label.group-c { color: #2ecc71; }
-.candidate-chip.selected-c {
-  background: rgba(46,204,113,0.15);
-  border-color: #2ecc71;
-  color: #2ecc71;
-}
 
 .candidate-chip {
   display: inline-flex;
@@ -479,8 +497,13 @@ li.cem-open .cem-dropdown {
   border-color: var(--rep);
   color: var(--rep);
 }
+.candidate-chip.selected-c {
+  background: rgba(46,204,113,0.15);
+  border-color: #2ecc71;
+  color: #2ecc71;
+}
 
-/* Geographic filter */
+/* ── Geographic filter ─────────────────────────────────────── */
 .geo-filter {
   display: flex;
   flex-wrap: wrap;
@@ -572,3 +595,48 @@ li.cem-open .cem-dropdown {
 
 .text-muted { color: var(--text-muted); font-size: 0.8rem; }
 .text-mono  { font-family: var(--font-mono); }
+
+/* ── Mobile breakpoints ────────────────────────────────────── */
+@media (max-width: 960px) {
+  .page-content { padding: 12px; }
+
+  .maps-layout { grid-template-columns: 1fr; }
+
+  .maps-sidebar {
+    position: fixed;
+    top: var(--nav-height);
+    left: 0;
+    bottom: 0;
+    width: 280px;
+    max-height: 100%;
+    background: var(--bg-surface);
+    border-right: 1px solid var(--border-strong);
+    z-index: 999;
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+    overflow-y: auto;
+    padding-top: 8px;
+  }
+  .maps-sidebar.sidebar-open { transform: translateX(0); }
+
+  .sidebar-toggle-btn { display: flex; }
+
+  .map-controls { gap: 6px; }
+  .control-group { padding: 3px 5px; }
+  .btn-toggle { padding: 4px 8px; font-size: 0.75rem; }
+
+  #map-container {
+    height: 320px;
+    margin: 0 12px;
+    width: calc(100% - 24px);
+  }
+
+  .stats-table { font-size: 0.8rem; }
+  .card { padding: 16px; }
+}
+
+@media (max-width: 480px) {
+  #map-container { height: 280px; }
+  .map-title { font-size: 1.1rem; }
+  .btn-toggle { padding: 4px 6px; font-size: 0.7rem; }
+}

@@ -63,6 +63,16 @@
     .legend-swatch {
       width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0;
     }
+    @media (max-width: 960px) {
+  .leaflet-control-zoom {
+    margin-left: auto !important;
+    margin-right: 8px !important;
+  }
+  .leaflet-top.leaflet-left {
+    left: auto !important;
+    right: 0 !important;
+  }
+}
   </style>
 </head>
 <body>
@@ -72,7 +82,6 @@
   <div class="loading-text">Loading election data…</div>
   <div class="loading-sub">This may take a moment on first load</div>
 </div>
-
 
 <div class="page-content">
   <div class="maps-layout">
@@ -89,8 +98,13 @@
 
     <main class="map-main">
 
+      <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
       <div class="map-header">
-        <div id="map-title" class="map-title">Select a race</div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <button class="sidebar-toggle-btn" id="sidebar-toggle">☰ Races</button>
+          <div id="map-title" class="map-title">Select a race</div>
+        </div>
         <div id="map-subtitle" class="map-subtitle">Choose a race from the sidebar to get started</div>
       </div>
 
@@ -100,6 +114,7 @@
           <button class="btn-toggle active" data-mode="winner">Winner Map</button>
           <button class="btn-toggle" data-mode="heat">Heat Map</button>
           <button class="btn-toggle" data-mode="group">Head to Head</button>
+          <button class="btn-toggle" data-mode="ordering" id="btn-ordering">Top 3</button>
         </div>
         <div class="control-group" id="heat-candidate-control" style="display:none">
           <span class="control-label">Candidate</span>
@@ -117,29 +132,42 @@
       <div class="map-legend" id="map-legend"></div>
       <div id="map-container"></div>
 
+      <div id="ordering-panel" style="display:none">
+        <h3>Top 3 — Pick up to 3 Candidates</h3>
+        <p>Color shows who ranked 1st among your selected candidates. Shade shows the runner-up order.</p>
+        <div style="margin-bottom:12px">
+          <div class="text-muted" style="margin-bottom:6px;font-size:0.775rem">Selected — click to remove</div>
+          <div id="ordering-selected" style="display:flex;flex-wrap:wrap;gap:4px;min-height:32px;border:1px solid var(--border);border-radius:6px;padding:6px;"></div>
+        </div>
+        <div>
+          <div class="text-muted" style="margin-bottom:6px;font-size:0.775rem">Available — click to add (max 3)</div>
+          <div id="ordering-available" style="display:flex;flex-wrap:wrap;gap:4px;"></div>
+        </div>
+      </div>
+
       <div class="grouping-panel" id="grouping-panel" style="display:none">
         <h3>Head to Head — Group Candidates</h3>
         <p>Assign candidates to groups to compare them. Click a chip to cycle it through Group A → Group B → Group C → unassigned.</p>
         <div class="groups-row" style="grid-template-columns: 1fr 1fr 1fr">
-            <div class="group-box" id="drop-zone-a" ondragover="event.preventDefault()" ondrop="ElectionUI.handleDrop(event,'a')">
-                <div class="group-box-label group-a">Group A</div>
-                <div id="group-a-chips"></div>
-                <div class="text-muted" id="group-a-empty" style="font-size:0.775rem;padding:4px 0">Drop candidates here</div>
-            </div>
-            <div class="group-box" id="drop-zone-b" ondragover="event.preventDefault()" ondrop="ElectionUI.handleDrop(event,'b')">
-                <div class="group-box-label group-b">Group B</div>
-                <div id="group-b-chips"></div>
-                <div class="text-muted" id="group-b-empty" style="font-size:0.775rem;padding:4px 0">Drop candidates here</div>
-            </div>
-            <div class="group-box" id="drop-zone-c" ondragover="event.preventDefault()" ondrop="ElectionUI.handleDrop(event,'c')">
-                <div class="group-box-label group-c">Group C</div>
-                <div id="group-c-chips"></div>
-                <div class="text-muted" id="group-c-empty" style="font-size:0.775rem;padding:4px 0">Drop candidates here</div>
-            </div>
+          <div class="group-box" id="drop-zone-a" ondragover="event.preventDefault()" ondrop="ElectionUI.handleDrop(event,'a')">
+            <div class="group-box-label group-a">Group A</div>
+            <div id="group-a-chips"></div>
+            <div class="text-muted" id="group-a-empty" style="font-size:0.775rem;padding:4px 0">Drop candidates here</div>
+          </div>
+          <div class="group-box" id="drop-zone-b" ondragover="event.preventDefault()" ondrop="ElectionUI.handleDrop(event,'b')">
+            <div class="group-box-label group-b">Group B</div>
+            <div id="group-b-chips"></div>
+            <div class="text-muted" id="group-b-empty" style="font-size:0.775rem;padding:4px 0">Drop candidates here</div>
+          </div>
+          <div class="group-box" id="drop-zone-c" ondragover="event.preventDefault()" ondrop="ElectionUI.handleDrop(event,'c')">
+            <div class="group-box-label group-c">Group C</div>
+            <div id="group-c-chips"></div>
+            <div class="text-muted" id="group-c-empty" style="font-size:0.775rem;padding:4px 0">Drop candidates here</div>
+          </div>
         </div>
         <div style="margin-top:14px">
-            <div class="text-muted" style="margin-bottom:6px;font-size:0.775rem">Unassigned — drag to a group or click to assign to Group A</div>
-            <div id="unassigned-chips" style="display:flex;flex-wrap:wrap;gap:4px;min-height:32px;border:1px dashed var(--border);border-radius:6px;padding:4px;" ondragover="event.preventDefault()" ondrop="ElectionUI.handleDrop(event,null)"></div>
+          <div class="text-muted" style="margin-bottom:6px;font-size:0.775rem">Unassigned — drag to a group or click to assign to Group A</div>
+          <div id="unassigned-chips" style="display:flex;flex-wrap:wrap;gap:4px;min-height:32px;border:1px dashed var(--border);border-radius:6px;padding:4px;" ondragover="event.preventDefault()" ondrop="ElectionUI.handleDrop(event,null)"></div>
         </div>
       </div>
 
@@ -168,12 +196,48 @@
       const overlay = document.getElementById('loading-overlay');
       overlay.classList.add('hidden');
       setTimeout(() => overlay.remove(), 500);
+      setTimeout(() => {
+        if (ElectionMap.map && window.innerWidth <= 960) ElectionMap.map.invalidateSize();
+      }, 100);
     })
+  
     .catch(err => {
       console.error('Failed to load data:', err);
       document.querySelector('.loading-text').textContent = 'Failed to load data.';
       document.querySelector('.loading-sub').textContent  = 'Check the browser console for details.';
     });
+
+  // Mobile sidebar toggle
+  const sidebarToggle  = document.getElementById('sidebar-toggle');
+  const sidebar        = document.querySelector('.maps-sidebar');
+  const sidebarOverlay = document.getElementById('sidebar-overlay');
+
+  function openSidebar() {
+    sidebar.classList.add('sidebar-open');
+    sidebarOverlay.classList.add('active');
+  }
+  function closeSidebar() {
+    sidebar.classList.remove('sidebar-open');
+    sidebarOverlay.classList.remove('active');
+    // Tell Leaflet to recalculate its size after sidebar animation
+    setTimeout(() => {
+      if (ElectionMap.map) ElectionMap.map.invalidateSize();
+    }, 300);
+  }
+
+  sidebarToggle.addEventListener('click', () => {
+    sidebar.classList.contains('sidebar-open') ? closeSidebar() : openSidebar();
+  });
+  sidebarOverlay.addEventListener('click', closeSidebar);
+
+  // Auto-close sidebar when a race is selected on mobile
+  document.getElementById('race-list').addEventListener('click', e => {
+    if (e.target.closest('.sidebar-race-btn') && window.innerWidth <= 960) {
+      closeSidebar();
+      const btn = e.target.closest('.sidebar-race-btn');
+      sidebarToggle.textContent = '☰ ' + btn.textContent.trim();
+    }
+  });
 </script>
 
 </body>
