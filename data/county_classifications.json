@@ -1,0 +1,614 @@
+{
+  "ADAMS": {
+    "metro_area": null,
+    "upstate_downstate": "Downstate",
+    "region": "Central",
+    "urban_rural": "Rural"
+  },
+  "ALEXANDER": {
+    "metro_area": null,
+    "upstate_downstate": "Downstate",
+    "region": "Southern",
+    "urban_rural": "Rural"
+  },
+  "BOND": {
+    "metro_area": "Metro East",
+    "upstate_downstate": "Downstate",
+    "region": "Southern",
+    "urban_rural": "Metro East"
+  },
+  "BOONE": {
+    "metro_area": "Rockford",
+    "upstate_downstate": "Downstate",
+    "region": "Northern",
+    "urban_rural": "Rural"
+  },
+  "BROWN": {
+    "metro_area": null,
+    "upstate_downstate": "Downstate",
+    "region": "Central",
+    "urban_rural": "Rural"
+  },
+  "BUREAU": {
+    "metro_area": "Ottawa",
+    "upstate_downstate": "Downstate",
+    "region": "Northern",
+    "urban_rural": "Rural"
+  },
+  "CALHOUN": {
+    "metro_area": "Metro East",
+    "upstate_downstate": "Downstate",
+    "region": "Southern",
+    "urban_rural": "Metro East"
+  },
+  "CARROLL": {
+    "metro_area": null,
+    "upstate_downstate": "Downstate",
+    "region": "Northern",
+    "urban_rural": "Rural"
+  },
+  "CASS": {
+    "metro_area": null,
+    "upstate_downstate": "Downstate",
+    "region": "Central",
+    "urban_rural": "Rural"
+  },
+  "CHAMPAIGN": {
+    "metro_area": "Champaign-Urbana",
+    "upstate_downstate": "Downstate",
+    "region": "Central",
+    "urban_rural": "Small Urban"
+  },
+  "CHRISTIAN": {
+    "metro_area": null,
+    "upstate_downstate": "Downstate",
+    "region": "Central",
+    "urban_rural": "Rural"
+  },
+  "CLARK": {
+    "metro_area": null,
+    "upstate_downstate": "Downstate",
+    "region": "Central",
+    "urban_rural": "Rural"
+  },
+  "CLAY": {
+    "metro_area": null,
+    "upstate_downstate": "Downstate",
+    "region": "Southern",
+    "urban_rural": "Rural"
+  },
+  "CLINTON": {
+    "metro_area": "Metro East",
+    "upstate_downstate": "Downstate",
+    "region": "Southern",
+    "urban_rural": "Metro East"
+  },
+  "COLES": {
+    "metro_area": null,
+    "upstate_downstate": "Downstate",
+    "region": "Central",
+    "urban_rural": "Rural"
+  },
+  "COOK": {
+    "metro_area": "Chicago",
+    "upstate_downstate": "Upstate",
+    "region": "Northern",
+    "urban_rural": "Cook County"
+  },
+  "CRAWFORD": {
+    "metro_area": null,
+    "upstate_downstate": "Downstate",
+    "region": "Southern",
+    "urban_rural": "Rural"
+  },
+  "CUMBERLAND": {
+    "metro_area": null,
+    "upstate_downstate": "Downstate",
+    "region": "Central",
+    "urban_rural": "Rural"
+  },
+  "DE WITT": {
+    "metro_area": null,
+    "upstate_downstate": "Downstate",
+    "region": "Central",
+    "urban_rural": "Rural"
+  },
+  "DEKALB": {
+    "metro_area": "Chicago",
+    "upstate_downstate": "Upstate",
+    "region": "Northern",
+    "urban_rural": "Suburban"
+  },
+  "DOUGLAS": {
+    "metro_area": null,
+    "upstate_downstate": "Downstate",
+    "region": "Central",
+    "urban_rural": "Rural"
+  },
+  "DUPAGE": {
+    "metro_area": "Chicago",
+    "upstate_downstate": "Upstate",
+    "region": "Northern",
+    "urban_rural": "Suburban"
+  },
+  "EDGAR": {
+    "metro_area": null,
+    "upstate_downstate": "Downstate",
+    "region": "Central",
+    "urban_rural": "Rural"
+  },
+  "EDWARDS": {
+    "metro_area": null,
+    "upstate_downstate": "Downstate",
+    "region": "Southern",
+    "urban_rural": "Rural"
+  },
+  "EFFINGHAM": {
+    "metro_area": null,
+    "upstate_downstate": "Downstate",
+    "region": "Southern",
+    "urban_rural": "Rural"
+  },
+  "FAYETTE": {
+    "metro_area": null,
+    "upstate_downstate": "Downstate",
+    "region": "Southern",
+    "urban_rural": "Rural"
+  },
+  "FORD": {
+    "metro_area": "Champaign-Urbana",
+    "upstate_downstate": "Downstate",
+    "region": "Central",
+    "urban_rural": "Rural"
+  },
+  "FRANKLIN": {
+    "metro_area": null,
+    "upstate_downstate": "Downstate",
+    "region": "Southern",
+    "urban_rural": "Rural"
+  },
+  "FULTON": {
+    "metro_area": null,
+    "upstate_downstate": "Downstate",
+    "region": "Central",
+    "urban_rural": "Rural"
+  },
+  "GALLATIN": {
+    "metro_area": null,
+    "upstate_downstate": "Downstate",
+    "region": "Southern",
+    "urban_rural": "Rural"
+  },
+  "GREENE": {
+    "metro_area": null,
+    "upstate_downstate": "Downstate",
+    "region": "Central",
+    "urban_rural": "Rural"
+  },
+  "GRUNDY": {
+    "metro_area": "Chicago",
+    "upstate_downstate": "Upstate",
+    "region": "Northern",
+    "urban_rural": "Suburban"
+  },
+  "HAMILTON": {
+    "metro_area": null,
+    "upstate_downstate": "Downstate",
+    "region": "Southern",
+    "urban_rural": "Rural"
+  },
+  "HANCOCK": {
+    "metro_area": null,
+    "upstate_downstate": "Downstate",
+    "region": "Central",
+    "urban_rural": "Rural"
+  },
+  "HARDIN": {
+    "metro_area": null,
+    "upstate_downstate": "Downstate",
+    "region": "Southern",
+    "urban_rural": "Rural"
+  },
+  "HENDERSON": {
+    "metro_area": null,
+    "upstate_downstate": "Downstate",
+    "region": "Central",
+    "urban_rural": "Rural"
+  },
+  "HENRY": {
+    "metro_area": "Quad Cities",
+    "upstate_downstate": "Downstate",
+    "region": "Northern",
+    "urban_rural": "Rural"
+  },
+  "IROQUOIS": {
+    "metro_area": null,
+    "upstate_downstate": "Downstate",
+    "region": "Central",
+    "urban_rural": "Rural"
+  },
+  "JACKSON": {
+    "metro_area": null,
+    "upstate_downstate": "Downstate",
+    "region": "Southern",
+    "urban_rural": "Small Urban"
+  },
+  "JASPER": {
+    "metro_area": null,
+    "upstate_downstate": "Downstate",
+    "region": "Southern",
+    "urban_rural": "Rural"
+  },
+  "JEFFERSON": {
+    "metro_area": null,
+    "upstate_downstate": "Downstate",
+    "region": "Southern",
+    "urban_rural": "Rural"
+  },
+  "JERSEY": {
+    "metro_area": "Metro East",
+    "upstate_downstate": "Downstate",
+    "region": "Southern",
+    "urban_rural": "Metro East"
+  },
+  "JO DAVIESS": {
+    "metro_area": null,
+    "upstate_downstate": "Downstate",
+    "region": "Northern",
+    "urban_rural": "Rural"
+  },
+  "JOHNSON": {
+    "metro_area": null,
+    "upstate_downstate": "Downstate",
+    "region": "Southern",
+    "urban_rural": "Rural"
+  },
+  "KANE": {
+    "metro_area": "Chicago",
+    "upstate_downstate": "Upstate",
+    "region": "Northern",
+    "urban_rural": "Suburban"
+  },
+  "KANKAKEE": {
+    "metro_area": "Kankakee",
+    "upstate_downstate": "Downstate",
+    "region": "Northern",
+    "urban_rural": "Rural"
+  },
+  "KENDALL": {
+    "metro_area": "Chicago",
+    "upstate_downstate": "Upstate",
+    "region": "Northern",
+    "urban_rural": "Suburban"
+  },
+  "KNOX": {
+    "metro_area": null,
+    "upstate_downstate": "Downstate",
+    "region": "Central",
+    "urban_rural": "Rural"
+  },
+  "LA SALLE": {
+    "metro_area": "Ottawa",
+    "upstate_downstate": "Downstate",
+    "region": "Northern",
+    "urban_rural": "Rural"
+  },
+  "LAKE": {
+    "metro_area": "Chicago",
+    "upstate_downstate": "Upstate",
+    "region": "Northern",
+    "urban_rural": "Suburban"
+  },
+  "LAWRENCE": {
+    "metro_area": null,
+    "upstate_downstate": "Downstate",
+    "region": "Southern",
+    "urban_rural": "Rural"
+  },
+  "LEE": {
+    "metro_area": null,
+    "upstate_downstate": "Downstate",
+    "region": "Northern",
+    "urban_rural": "Rural"
+  },
+  "LIVINGSTON": {
+    "metro_area": null,
+    "upstate_downstate": "Downstate",
+    "region": "Central",
+    "urban_rural": "Rural"
+  },
+  "LOGAN": {
+    "metro_area": null,
+    "upstate_downstate": "Downstate",
+    "region": "Central",
+    "urban_rural": "Rural"
+  },
+  "MACON": {
+    "metro_area": null,
+    "upstate_downstate": "Downstate",
+    "region": "Central",
+    "urban_rural": "Small Urban"
+  },
+  "MACOUPIN": {
+    "metro_area": "Metro East",
+    "upstate_downstate": "Downstate",
+    "region": "Southern",
+    "urban_rural": "Metro East"
+  },
+  "MADISON": {
+    "metro_area": "Metro East",
+    "upstate_downstate": "Downstate",
+    "region": "Southern",
+    "urban_rural": "Metro East"
+  },
+  "MARION": {
+    "metro_area": null,
+    "upstate_downstate": "Downstate",
+    "region": "Southern",
+    "urban_rural": "Rural"
+  },
+  "MARSHALL": {
+    "metro_area": "Peoria",
+    "upstate_downstate": "Downstate",
+    "region": "Central",
+    "urban_rural": "Rural"
+  },
+  "MASON": {
+    "metro_area": null,
+    "upstate_downstate": "Downstate",
+    "region": "Central",
+    "urban_rural": "Rural"
+  },
+  "MASSAC": {
+    "metro_area": null,
+    "upstate_downstate": "Downstate",
+    "region": "Southern",
+    "urban_rural": "Rural"
+  },
+  "MCDONOUGH": {
+    "metro_area": null,
+    "upstate_downstate": "Downstate",
+    "region": "Central",
+    "urban_rural": "Rural"
+  },
+  "MCHENRY": {
+    "metro_area": "Chicago",
+    "upstate_downstate": "Upstate",
+    "region": "Northern",
+    "urban_rural": "Suburban"
+  },
+  "MCLEAN": {
+    "metro_area": "Bloomington-Normal",
+    "upstate_downstate": "Downstate",
+    "region": "Central",
+    "urban_rural": "Small Urban"
+  },
+  "MENARD": {
+    "metro_area": "Springfield",
+    "upstate_downstate": "Downstate",
+    "region": "Central",
+    "urban_rural": "Rural"
+  },
+  "MERCER": {
+    "metro_area": "Quad Cities",
+    "upstate_downstate": "Downstate",
+    "region": "Northern",
+    "urban_rural": "Rural"
+  },
+  "MONROE": {
+    "metro_area": "Metro East",
+    "upstate_downstate": "Downstate",
+    "region": "Southern",
+    "urban_rural": "Metro East"
+  },
+  "MONTGOMERY": {
+    "metro_area": null,
+    "upstate_downstate": "Downstate",
+    "region": "Central",
+    "urban_rural": "Rural"
+  },
+  "MORGAN": {
+    "metro_area": null,
+    "upstate_downstate": "Downstate",
+    "region": "Central",
+    "urban_rural": "Rural"
+  },
+  "MOULTRIE": {
+    "metro_area": null,
+    "upstate_downstate": "Downstate",
+    "region": "Central",
+    "urban_rural": "Rural"
+  },
+  "OGLE": {
+    "metro_area": null,
+    "upstate_downstate": "Downstate",
+    "region": "Northern",
+    "urban_rural": "Rural"
+  },
+  "PEORIA": {
+    "metro_area": "Peoria",
+    "upstate_downstate": "Downstate",
+    "region": "Central",
+    "urban_rural": "Small Urban"
+  },
+  "PERRY": {
+    "metro_area": null,
+    "upstate_downstate": "Downstate",
+    "region": "Southern",
+    "urban_rural": "Rural"
+  },
+  "PIATT": {
+    "metro_area": "Champaign-Urbana",
+    "upstate_downstate": "Downstate",
+    "region": "Central",
+    "urban_rural": "Rural"
+  },
+  "PIKE": {
+    "metro_area": null,
+    "upstate_downstate": "Downstate",
+    "region": "Central",
+    "urban_rural": "Rural"
+  },
+  "POPE": {
+    "metro_area": null,
+    "upstate_downstate": "Downstate",
+    "region": "Southern",
+    "urban_rural": "Rural"
+  },
+  "PULASKI": {
+    "metro_area": null,
+    "upstate_downstate": "Downstate",
+    "region": "Southern",
+    "urban_rural": "Rural"
+  },
+  "PUTNAM": {
+    "metro_area": "Ottawa",
+    "upstate_downstate": "Downstate",
+    "region": "Northern",
+    "urban_rural": "Rural"
+  },
+  "RANDOLPH": {
+    "metro_area": null,
+    "upstate_downstate": "Downstate",
+    "region": "Southern",
+    "urban_rural": "Rural"
+  },
+  "RICHLAND": {
+    "metro_area": null,
+    "upstate_downstate": "Downstate",
+    "region": "Southern",
+    "urban_rural": "Rural"
+  },
+  "ROCK ISLAND": {
+    "metro_area": "Quad Cities",
+    "upstate_downstate": "Downstate",
+    "region": "Northern",
+    "urban_rural": "Small Urban"
+  },
+  "SALINE": {
+    "metro_area": null,
+    "upstate_downstate": "Downstate",
+    "region": "Southern",
+    "urban_rural": "Rural"
+  },
+  "SANGAMON": {
+    "metro_area": "Springfield",
+    "upstate_downstate": "Downstate",
+    "region": "Central",
+    "urban_rural": "Small Urban"
+  },
+  "SCHUYLER": {
+    "metro_area": null,
+    "upstate_downstate": "Downstate",
+    "region": "Central",
+    "urban_rural": "Rural"
+  },
+  "SCOTT": {
+    "metro_area": null,
+    "upstate_downstate": "Downstate",
+    "region": "Central",
+    "urban_rural": "Rural"
+  },
+  "SHELBY": {
+    "metro_area": null,
+    "upstate_downstate": "Downstate",
+    "region": "Central",
+    "urban_rural": "Rural"
+  },
+  "ST. CLAIR": {
+    "metro_area": "Metro East",
+    "upstate_downstate": "Downstate",
+    "region": "Southern",
+    "urban_rural": "Metro East"
+  },
+  "STARK": {
+    "metro_area": "Peoria",
+    "upstate_downstate": "Downstate",
+    "region": "Central",
+    "urban_rural": "Rural"
+  },
+  "STEPHENSON": {
+    "metro_area": null,
+    "upstate_downstate": "Downstate",
+    "region": "Northern",
+    "urban_rural": "Rural"
+  },
+  "TAZEWELL": {
+    "metro_area": "Peoria",
+    "upstate_downstate": "Downstate",
+    "region": "Central",
+    "urban_rural": "Rural"
+  },
+  "UNION": {
+    "metro_area": null,
+    "upstate_downstate": "Downstate",
+    "region": "Southern",
+    "urban_rural": "Rural"
+  },
+  "VERMILION": {
+    "metro_area": null,
+    "upstate_downstate": "Downstate",
+    "region": "Central",
+    "urban_rural": "Rural"
+  },
+  "WABASH": {
+    "metro_area": null,
+    "upstate_downstate": "Downstate",
+    "region": "Southern",
+    "urban_rural": "Rural"
+  },
+  "WARREN": {
+    "metro_area": null,
+    "upstate_downstate": "Downstate",
+    "region": "Central",
+    "urban_rural": "Rural"
+  },
+  "WASHINGTON": {
+    "metro_area": null,
+    "upstate_downstate": "Downstate",
+    "region": "Southern",
+    "urban_rural": "Rural"
+  },
+  "WAYNE": {
+    "metro_area": null,
+    "upstate_downstate": "Downstate",
+    "region": "Southern",
+    "urban_rural": "Rural"
+  },
+  "WHITE": {
+    "metro_area": null,
+    "upstate_downstate": "Downstate",
+    "region": "Southern",
+    "urban_rural": "Rural"
+  },
+  "WHITESIDE": {
+    "metro_area": null,
+    "upstate_downstate": "Downstate",
+    "region": "Northern",
+    "urban_rural": "Rural"
+  },
+  "WILL": {
+    "metro_area": "Chicago",
+    "upstate_downstate": "Upstate",
+    "region": "Northern",
+    "urban_rural": "Suburban"
+  },
+  "WILLIAMSON": {
+    "metro_area": null,
+    "upstate_downstate": "Downstate",
+    "region": "Southern",
+    "urban_rural": "Rural"
+  },
+  "WINNEBAGO": {
+    "metro_area": "Rockford",
+    "upstate_downstate": "Downstate",
+    "region": "Northern",
+    "urban_rural": "Small Urban"
+  },
+  "WOODFORD": {
+    "metro_area": "Peoria",
+    "upstate_downstate": "Downstate",
+    "region": "Central",
+    "urban_rural": "Rural"
+  }
+}

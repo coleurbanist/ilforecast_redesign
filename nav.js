@@ -16,7 +16,13 @@
         { label: 'IL-09 Dem Primary Model', href: 'IL09_precinct_map.html' },
       ],
     },
-    { label: 'Maps', href: 'maps.html' },
+    {
+      label: '2026 Maps',
+      children: [
+        { label: 'Precinct Results', href: 'maps.html' },
+        { label: 'County Maps', href: 'county_maps.html' },
+      ],
+    },
   ];
   // ─────────────────────────────────────────────────────────────────────────
 

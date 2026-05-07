@@ -1,0 +1,1525 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>2026 County Maps — Cole's Election Models</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+  <style>
+    .county-layout {
+      display: flex;
+      flex-direction: column;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+    }
+
+    /* ── Controls bar ── */
+    .county-controls {
+      background: var(--bg-surface);
+      border-bottom: 1px solid var(--border);
+      padding: 8px 16px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+    .county-controls-title {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-right: 4px;
+    }
+    .race-select-wrap {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 4px 6px;
+    }
+    #race-select {
+      background: transparent;
+      border: none;
+      color: var(--text-primary);
+      font-family: var(--font-body);
+      font-size: 0.8rem;
+      cursor: pointer;
+      outline: none;
+      max-width: 300px;
+    }
+    #race-select option, #race-select optgroup { background: var(--bg-raised); color: var(--text-primary); }
+    #heat-cand-select {
+      background: var(--bg-raised);
+      border: none;
+      color: var(--text-primary);
+      font-family: var(--font-body);
+      font-size: 0.8rem;
+      padding: 4px 8px;
+      border-radius: 5px;
+      cursor: pointer;
+      outline: none;
+    }
+
+    /* ── Map area ── */
+    .county-map-area {
+      height: clamp(450px, calc(100vh - 180px), 800px);
+      position: relative;
+      overflow: hidden;
+    }
+    #county-map { position: absolute; inset: 0; }
+
+    /* ── Legend ── */
+    .county-legend {
+      position: absolute;
+      bottom: 24px;
+      left: 16px;
+      background: rgba(13,17,23,0.92);
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-lg);
+      padding: 10px 14px;
+      z-index: 1000;
+      max-width: 240px;
+      backdrop-filter: blur(8px);
+    }
+    .county-legend-title {
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+    .legend-row { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
+    .legend-row:last-child { margin-bottom: 0; }
+    .legend-swatch { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+    .legend-name { font-size: 0.775rem; color: var(--text-secondary); line-height: 1.3; }
+    .legend-count { color: var(--text-muted); font-size: 0.725rem; }
+
+    /* ── Info panel ── */
+    .county-info {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      width: 270px;
+      background: rgba(22,27,34,0.97);
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-lg);
+      padding: 14px;
+      z-index: 1000;
+      box-shadow: var(--shadow-lg);
+      backdrop-filter: blur(8px);
+      display: none;
+      max-height: calc(100% - 32px);
+      overflow-y: auto;
+    }
+    .county-info.visible { display: block; }
+    .county-info-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+    .county-info-name { font-size: 1rem; font-weight: 600; color: var(--text-primary); }
+    .county-info-close {
+      background: none; border: none; color: var(--text-muted);
+      cursor: pointer; font-size: 1.1rem; padding: 2px 6px;
+      border-radius: 4px; transition: color 0.12s, background 0.12s; line-height: 1;
+    }
+    .county-info-close:hover { color: var(--text-primary); background: var(--bg-highlight); }
+    .county-info-race { font-size: 0.72rem; color: var(--text-muted); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
+    .county-cand-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border); }
+    .county-cand-row:last-child { border-bottom: none; }
+    .cand-color-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .cand-name { flex: 1; font-size: 0.8rem; color: var(--text-secondary); }
+    .cand-name.winner { color: var(--text-primary); font-weight: 600; }
+    .cand-votes { font-size: 0.775rem; color: var(--text-muted); }
+    .cand-pct { font-size: 0.775rem; color: var(--text-secondary); min-width: 38px; text-align: right; }
+
+    /* ── Ordering / grouping panels (integrated into layout card) ── */
+    #county-ordering-panel,
+    #county-grouping-panel {
+      border: none;
+      border-radius: 0;
+      border-top: 1px solid var(--border);
+      background: var(--bg-surface);
+    }
+
+    /* ── Leaflet overrides ── */
+    .leaflet-tooltip.county-tt {
+      background: rgba(13,17,23,0.97) !important;
+      border: 1px solid rgba(255,255,255,0.15) !important;
+      border-radius: 8px !important;
+      color: #e6edf3 !important;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.6) !important;
+      padding: 8px 12px !important;
+      font-family: var(--font-body) !important;
+      font-size: 0.85rem !important;
+    }
+    .leaflet-tooltip.county-tt::before { display: none !important; }
+    .leaflet-control-zoom a { background: #1c2330 !important; color: #e6edf3 !important; border-color: rgba(255,255,255,0.1) !important; }
+    .leaflet-control-zoom a:hover { background: #242d3a !important; }
+    .leaflet-control-attribution { background: rgba(13,17,23,0.8) !important; color: #484f58 !important; font-size: 10px !important; }
+    .leaflet-control-attribution a { color: #484f58 !important; }
+
+    /* ── Results table ── */
+    .county-table-section { margin-top: 16px; }
+    .county-table-wrap {
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      overflow: auto;
+      max-height: 420px;
+    }
+    .county-results-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.8rem;
+      min-width: 500px;
+    }
+    .county-results-table thead th {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      background: var(--bg-surface);
+      border-bottom: 2px solid var(--border-strong);
+      padding: 8px 12px;
+      text-align: right;
+      white-space: nowrap;
+      cursor: pointer;
+      user-select: none;
+      color: var(--text-secondary);
+      font-weight: 600;
+      font-size: 0.775rem;
+    }
+    .county-results-table thead th:first-child { text-align: left; }
+    .county-results-table thead th:hover { color: var(--text-primary); background: var(--bg-highlight); }
+    .county-results-table thead th.th-sorted-asc::after { content: ' ▲'; font-size: 0.65rem; vertical-align: middle; }
+    .county-results-table thead th.th-sorted-desc::after { content: ' ▼'; font-size: 0.65rem; vertical-align: middle; }
+    .county-results-table .statewide-row td {
+      padding: 8px 12px;
+      background: var(--bg-raised);
+      border-bottom: 2px solid var(--border-strong);
+      font-weight: 600;
+      text-align: right;
+      white-space: nowrap;
+      color: var(--text-primary);
+    }
+    .county-results-table .statewide-row td:first-child { text-align: left; }
+    .county-results-table tbody tr:not(.statewide-row) td {
+      padding: 6px 12px;
+      border-bottom: 1px solid var(--border);
+      text-align: right;
+      white-space: nowrap;
+      color: var(--text-secondary);
+    }
+    .county-results-table tbody tr:not(.statewide-row) td:first-child {
+      text-align: left;
+      color: var(--text-primary);
+    }
+    .county-results-table tbody tr:not(.statewide-row):last-child td { border-bottom: none; }
+    .county-results-table tbody tr:not(.statewide-row):hover td { background: var(--bg-highlight); }
+
+    /* ── Mobile ── */
+    @media (max-width: 768px) {
+      .county-map-area { height: 60vh; }
+      .county-info {
+        position: fixed;
+        bottom: 0; right: 0; left: 0; top: auto;
+        width: 100%;
+        border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+        max-height: 50vh;
+      }
+      #race-select { max-width: 180px; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="page-content" style="padding-top:24px;padding-bottom:24px;">
+<div class="county-layout">
+
+  <!-- Controls bar -->
+  <div class="county-controls">
+    <span class="county-controls-title">2026 Illinois Primary</span>
+
+    <div class="race-select-wrap">
+      <span class="control-label">Race</span>
+      <select id="race-select"></select>
+    </div>
+
+    <div class="control-group" id="party-control">
+      <span class="control-label">Party</span>
+      <button class="btn-toggle active" data-party="DEMOCRATIC">Dem</button>
+      <button class="btn-toggle" data-party="REPUBLICAN">Rep</button>
+      <button class="btn-toggle" data-party="COMPOSITE">Composite</button>
+    </div>
+
+    <div class="control-group" id="mode-control">
+      <span class="control-label">View</span>
+      <button class="btn-toggle active" data-mode="winner">Winner</button>
+      <button class="btn-toggle" data-mode="heat">Heat Map</button>
+      <button class="btn-toggle" data-mode="group">Head to Head</button>
+      <button class="btn-toggle" data-mode="ordering">Top 3</button>
+    </div>
+
+    <div class="control-group" id="heat-cand-control" style="display:none">
+      <span class="control-label">Candidate</span>
+      <select id="heat-cand-select"></select>
+    </div>
+  </div>
+
+  <!-- Map -->
+  <div class="county-map-area">
+    <div id="county-map"></div>
+    <div class="county-legend" id="county-legend" style="display:none"></div>
+    <div class="county-info" id="county-info">
+      <div class="county-info-header">
+        <div class="county-info-name" id="county-info-name"></div>
+        <button class="county-info-close" id="county-info-close">×</button>
+      </div>
+      <div class="county-info-race" id="county-info-race"></div>
+      <div id="county-info-results"></div>
+    </div>
+  </div>
+
+  <!-- Top 3 panel -->
+  <div class="grouping-panel" id="county-ordering-panel" style="display:none">
+    <h3>Top 3 — Pick up to 3 Candidates</h3>
+    <p>Color shows who ranked 1st among your selected candidates. Shade shows the runner-up order.</p>
+    <div style="margin-bottom:12px">
+      <div class="text-muted" style="margin-bottom:6px;font-size:0.775rem">Selected — click to remove</div>
+      <div id="ordering-selected" style="display:flex;flex-wrap:wrap;gap:4px;min-height:32px;border:1px solid var(--border);border-radius:6px;padding:6px;"></div>
+    </div>
+    <div>
+      <div class="text-muted" style="margin-bottom:6px;font-size:0.775rem">Available — click to add (max 3)</div>
+      <div id="ordering-available" style="display:flex;flex-wrap:wrap;gap:4px;"></div>
+    </div>
+  </div>
+
+  <!-- Head to Head panel -->
+  <div class="grouping-panel" id="county-grouping-panel" style="display:none">
+    <h3>Head to Head — Group Candidates</h3>
+    <p>Click a chip to cycle it through Group A → B → C → unassigned. You can also drag chips between groups.</p>
+    <div class="groups-row" style="grid-template-columns: 1fr 1fr 1fr">
+      <div class="group-box" id="county-drop-a">
+        <div class="group-box-label group-a">Group A</div>
+        <div id="county-group-a-chips"></div>
+        <div class="text-muted" id="county-group-a-empty" style="font-size:0.775rem;padding:4px 0">Add candidates below</div>
+      </div>
+      <div class="group-box" id="county-drop-b">
+        <div class="group-box-label group-b">Group B</div>
+        <div id="county-group-b-chips"></div>
+        <div class="text-muted" id="county-group-b-empty" style="font-size:0.775rem;padding:4px 0">Add candidates below</div>
+      </div>
+      <div class="group-box" id="county-drop-c">
+        <div class="group-box-label group-c">Group C</div>
+        <div id="county-group-c-chips"></div>
+        <div class="text-muted" id="county-group-c-empty" style="font-size:0.775rem;padding:4px 0">Add candidates below</div>
+      </div>
+    </div>
+    <div style="margin-top:14px">
+      <div class="text-muted" style="margin-bottom:6px;font-size:0.775rem">Unassigned — click to assign to Group A</div>
+      <div id="county-unassigned-chips" style="display:flex;flex-wrap:wrap;gap:4px;min-height:32px;border:1px dashed var(--border);border-radius:6px;padding:4px;"></div>
+    </div>
+  </div>
+
+</div>
+
+  <div class="county-table-section" id="county-table-section">
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:8px">
+      <div class="control-group" id="table-view-control">
+        <button class="btn-toggle active" data-view="counties">Counties</button>
+        <button class="btn-toggle" data-view="regions">By Region</button>
+      </div>
+      <div id="class-groupby-wrap" style="display:none;align-items:center;gap:8px">
+        <span class="control-label">Group By</span>
+        <div class="control-group" id="class-groupby-buttons">
+          <button class="btn-toggle active" data-groupby="region">Region</button>
+          <button class="btn-toggle" data-groupby="urban_rural">Urban/Rural</button>
+          <button class="btn-toggle" data-groupby="upstate_downstate">Upstate/Down.</button>
+          <button class="btn-toggle" data-groupby="metro_area">Metro Area</button>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span class="control-label">Show</span>
+        <div class="control-group" id="table-display-control">
+          <button class="btn-toggle active" data-display="votes">Votes</button>
+          <button class="btn-toggle" data-display="pct">%</button>
+        </div>
+      </div>
+    </div>
+    <div class="county-table-wrap">
+      <table class="county-results-table" id="county-results-table">
+        <thead id="county-table-head"></thead>
+        <tbody id="county-table-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="nav.js"></script>
+<script>
+(function () {
+  const GEOJSON_PATH        = 'data/election_shapefiles/IL_counties.geojson';
+  const DATA_PATH           = 'data/election_csvs/clean/2026/Primary/2026_primary_counties.json';
+  const CLASSIFICATIONS_PATH = 'data/county_classifications.json';
+
+  const CANDIDATE_COLORS = [
+    '#4f93d1', '#d16f4f', '#5cb85c', '#9b59b6',
+    '#f39c12', '#1abc9c', '#e74c3c', '#3498db',
+    '#e67e22', '#2ecc71', '#95a5a6', '#c0392b',
+    '#f1c40f',
+  ];
+  const ORDERING_SHADES = {
+    '01': 0.95, '10': 0.95,
+    '012': 0.95, '021': 0.45,
+    '102': 0.95, '120': 0.45,
+    '201': 0.95, '210': 0.45,
+  };
+  const ORDERING_LEADER_COLORS = ['#4f93d1', '#d16f4f', '#2ecc71'];
+
+  const STATEWIDE_ORDER = [
+    'UNITED STATES SENATOR', 'GOVERNOR AND LIEUTENANT GOVERNOR',
+    'ATTORNEY GENERAL', 'COMPTROLLER', 'SECRETARY OF STATE', 'TREASURER',
+  ];
+
+  // GeoJSON "JO DAVIESS" → data key "JODAVIESS"
+  const GEO_TO_DATA = { 'JO DAVIESS': 'JODAVIESS' };
+  function dataKey(n) { return GEO_TO_DATA[n] || n; }
+
+  let countyData = null, countiesGeo = null;
+  let map = null, geojsonLayer = null;
+  let colorMap = {};
+
+  let currentRace   = 'UNITED STATES SENATOR';
+  let currentParty  = 'DEMOCRATIC';
+  let currentMode   = 'winner';
+  let selectedCounty = null;
+
+  // Per-mode state
+  let heatCandidate = null, heatCache = null;
+  let groupA = [], groupB = [], groupC = [], groupCache = null;
+  let orderingCands = [], orderingCache = null;
+  let compositeCache = null;
+
+  let tableSort = { col: null, dir: 'asc' };
+  let tableDisplay = 'votes';
+  let classificationData = null;
+  let classViewMode = 'counties';
+  let classGroupBy = 'region';
+
+  const DATA_TO_GEO = { 'JODAVIESS': 'JO DAVIESS', 'DEWITT': 'DE WITT', 'LASALLE': 'LA SALLE' };
+  function displayCounty(k) { return title(DATA_TO_GEO[k] || k) + ' County'; }
+
+  // ── Helpers ───────────────────────────────────────────────────
+
+  function title(s) { return s.toLowerCase().replace(/\b\w/g, c => c.toUpperCase()); }
+
+  function getCands(nameOrKey, race, party) {
+    const cd = countyData[dataKey(nameOrKey)];
+    if (!cd) return [];
+    return (cd.races[race] || []).filter(c => c.party === party);
+  }
+
+  function getWinner(nameOrKey, race, party) {
+    const cs = getCands(nameOrKey, race, party);
+    return cs.length ? cs.reduce((a, b) => a.votes > b.votes ? a : b) : null;
+  }
+
+  let _candsCache = null, _candsCacheKey = null;
+  function allCands(race, party) {
+    const key = `${race}|${party}`;
+    if (_candsCacheKey === key) return _candsCache;
+    const names = new Set();
+    for (const cd of Object.values(countyData))
+      (cd.races[race] || []).filter(c => c.party === party).forEach(c => names.add(c.name));
+    _candsCache = [...names].sort();
+    _candsCacheKey = key;
+    return _candsCache;
+  }
+
+  function buildColorMap(race, party) {
+    colorMap = {};
+    allCands(race, party).forEach((name, i) => { colorMap[name] = CANDIDATE_COLORS[i % CANDIDATE_COLORS.length]; });
+  }
+
+  function ttRow(color, label, pct) {
+    return `<div style="display:flex;align-items:center;gap:7px;margin-top:4px">
+      <span style="width:8px;height:8px;border-radius:50%;background:${color};display:inline-block;flex-shrink:0"></span>
+      <span style="font-size:0.82em;flex:1">${label}</span>
+      <span style="font-size:0.78em;color:#8b949e">${pct}%</span>
+    </div>`;
+  }
+
+  function lerpColor(a, b, t) {
+    const ra = hexRgb(a), rb = hexRgb(b);
+    return `rgb(${Math.round(ra.r+(rb.r-ra.r)*t)},${Math.round(ra.g+(rb.g-ra.g)*t)},${Math.round(ra.b+(rb.b-ra.b)*t)})`;
+  }
+  function hexRgb(h) {
+    const r = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(h);
+    return r ? {r:parseInt(r[1],16),g:parseInt(r[2],16),b:parseInt(r[3],16)} : {r:128,g:128,b:128};
+  }
+
+  // ── Data computations ──────────────────────────────────────────
+
+  function computeHeat(race, party, candidate) {
+    let tv = 0, cv = 0;
+    for (const k of Object.keys(countyData)) {
+      if (k === 'TOTALS') continue;
+      const cs = getCands(k, race, party);
+      const f = cs.find(c => c.name === candidate);
+      if (!f) continue;
+      const tot = cs.reduce((s, c) => s + c.votes, 0);
+      tv += tot; cv += f.votes;
+    }
+    const avg = tv > 0 ? cv / tv : 0;
+    const devs = new Map(); let maxDev = 0;
+    for (const k of Object.keys(countyData)) {
+      if (k === 'TOTALS') continue;
+      const cs = getCands(k, race, party);
+      const f = cs.find(c => c.name === candidate);
+      if (!f) continue;
+      const tot = cs.reduce((s, c) => s + c.votes, 0);
+      if (!tot) continue;
+      const pct = f.votes / tot, dev = pct - avg;
+      devs.set(k, { pct, dev, avg });
+      maxDev = Math.max(maxDev, Math.abs(dev));
+    }
+    return { devs, avg, maxDev: Math.max(maxDev, 0.05) };
+  }
+
+  function computeGroup(race, party) {
+    const m = new Map();
+    for (const k of Object.keys(countyData)) {
+      if (k === 'TOTALS') continue;
+      const cs = getCands(k, race, party);
+      const sum = arr => arr.reduce((s, n) => s + (cs.find(c => c.name === n)?.votes || 0), 0);
+      const a = sum(groupA), b = sum(groupB), c = sum(groupC);
+      m.set(k, { a, b, c, total: a + b + c });
+    }
+    return m;
+  }
+
+  function computeOrdering(race, party) {
+    const m = new Map();
+    for (const k of Object.keys(countyData)) {
+      if (k === 'TOTALS') continue;
+      const cs = getCands(k, race, party);
+      const ranked = orderingCands
+        .map((name, idx) => ({ idx, votes: cs.find(c => c.name === name)?.votes || 0 }))
+        .sort((a, b) => b.votes - a.votes);
+      m.set(k, { ordering: ranked.map(r => r.idx).join(''), ranked, total: ranked.reduce((s, r) => s + r.votes, 0) });
+    }
+    return m;
+  }
+
+  function computeComposite(race) {
+    const m = new Map();
+    for (const k of Object.keys(countyData)) {
+      if (k === 'TOTALS') continue;
+      const dem = getCands(k, race, 'DEMOCRATIC').reduce((s, c) => s + c.votes, 0);
+      const rep = getCands(k, race, 'REPUBLICAN').reduce((s, c) => s + c.votes, 0);
+      m.set(k, { dem, rep, total: dem + rep });
+    }
+    return m;
+  }
+
+  // ── Race dropdown ─────────────────────────────────────────────
+
+  function buildRaceDropdown() {
+    const allRaces = new Set();
+    for (const cd of Object.values(countyData)) for (const r of Object.keys(cd.races)) allRaces.add(r);
+
+    function classify(r) {
+      if (STATEWIDE_ORDER.includes(r))  return 'statewide';
+      if (/\bCONGRESS\b/.test(r))       return 'congress';
+      if (/\bSENATE\b/.test(r))          return 'senate';
+      if (/\bREPRESENTATIVE\b/.test(r)) return 'house';
+      return null;
+    }
+    const groups = {
+      statewide: { label: 'Statewide',    races: [] },
+      congress:  { label: 'U.S. Congress', races: [] },
+      senate:    { label: 'State Senate',  races: [] },
+      house:     { label: 'State House',   races: [] },
+    };
+    for (const r of STATEWIDE_ORDER) if (allRaces.has(r)) groups.statewide.races.push(r);
+    for (const r of [...allRaces].sort((a, b) => {
+      const na = parseInt(a, 10), nb = parseInt(b, 10);
+      if (!isNaN(na) && !isNaN(nb) && na !== nb) return na - nb;
+      return a.localeCompare(b);
+    })) { const g = classify(r); if (g && g !== 'statewide') groups[g].races.push(r); }
+
+    const sel = document.getElementById('race-select');
+    for (const { label, races } of Object.values(groups)) {
+      if (!races.length) continue;
+      const og = document.createElement('optgroup');
+      og.label = label;
+      for (const r of races) {
+        const opt = document.createElement('option');
+        opt.value = r; opt.textContent = title(r);
+        if (r === currentRace) opt.selected = true;
+        og.appendChild(opt);
+      }
+      sel.appendChild(og);
+    }
+    sel.addEventListener('change', () => { currentRace = sel.value; onRaceOrPartyChange(); });
+  }
+
+  // ── Party toggle ──────────────────────────────────────────────
+
+  function setupPartyToggle() {
+    document.querySelectorAll('#party-control .btn-toggle').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#party-control .btn-toggle').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentParty = btn.dataset.party;
+        onRaceOrPartyChange();
+      });
+    });
+  }
+
+  function onRaceOrPartyChange() {
+    resetModeState();
+    renderMap();
+  }
+
+  // ── Mode controls ─────────────────────────────────────────────
+
+  function setupModeButtons() {
+    document.querySelectorAll('#mode-control .btn-toggle').forEach(btn => {
+      btn.addEventListener('click', () => {
+        currentMode = btn.dataset.mode;
+        document.querySelectorAll('#mode-control .btn-toggle').forEach(b =>
+          b.classList.toggle('active', b.dataset.mode === currentMode));
+        applyMode();
+      });
+    });
+  }
+
+  function applyMode() {
+    tableSort = { col: null, dir: 'asc' };
+    document.getElementById('heat-cand-control').style.display   = currentMode === 'heat'     ? 'flex'  : 'none';
+    document.getElementById('county-ordering-panel').style.display = currentMode === 'ordering' ? 'block' : 'none';
+    document.getElementById('county-grouping-panel').style.display = currentMode === 'group'    ? 'block' : 'none';
+    if (currentMode === 'group') updateGroupPanel();
+    if (currentMode === 'ordering') buildOrderingPanel();
+    closeInfo();
+    renderMap();
+  }
+
+  function resetModeState() {
+    currentMode = 'winner';
+    groupA = []; groupB = []; groupC = [];
+    orderingCands = [];
+    heatCandidate = null; heatCache = null;
+    groupCache = null; orderingCache = null;
+    compositeCache = null;
+    selectedCounty = null;
+    tableSort = { col: null, dir: 'asc' };
+
+    document.querySelectorAll('#mode-control .btn-toggle').forEach(b =>
+      b.classList.toggle('active', b.dataset.mode === 'winner'));
+    document.getElementById('heat-cand-control').style.display = 'none';
+    document.getElementById('county-ordering-panel').style.display = 'none';
+    document.getElementById('county-grouping-panel').style.display = 'none';
+    closeInfo();
+
+    buildColorMap(currentRace, currentParty);
+    updateModeVisibility();
+    buildHeatSelect();
+    updateGroupPanel();
+    buildOrderingPanel();
+  }
+
+  function updateModeVisibility() {
+    const isComposite = currentParty === 'COMPOSITE';
+    const n = isComposite ? 0 : allCands(currentRace, currentParty).length;
+    ['heat', 'group', 'ordering'].forEach(mode => {
+      const btn = document.querySelector(`#mode-control [data-mode="${mode}"]`);
+      if (btn) btn.style.display = (!isComposite && n >= 3) ? '' : 'none';
+    });
+  }
+
+  // ── Heat map ──────────────────────────────────────────────────
+
+  function buildHeatSelect() {
+    const sel = document.getElementById('heat-cand-select');
+    sel.innerHTML = '';
+    for (const name of allCands(currentRace, currentParty)) {
+      const opt = document.createElement('option');
+      opt.value = name; opt.textContent = title(name);
+      sel.appendChild(opt);
+    }
+    heatCandidate = sel.value || null;
+    sel.onchange = () => { heatCandidate = sel.value; heatCache = null; if (currentMode === 'heat') renderMap(); };
+  }
+
+  // ── Grouping panel ────────────────────────────────────────────
+
+  function updateGroupPanel() {
+    const grpArr = { a: groupA, b: groupB, c: groupC };
+    ['a','b','c'].forEach(g => {
+      document.getElementById(`county-group-${g}-chips`).innerHTML = '';
+      document.getElementById(`county-group-${g}-empty`).style.display = grpArr[g].length ? 'none' : 'block';
+    });
+    document.getElementById('county-unassigned-chips').innerHTML = '';
+
+    for (const name of allCands(currentRace, currentParty)) {
+      const grp = groupA.includes(name) ? 'a' : groupB.includes(name) ? 'b' : groupC.includes(name) ? 'c' : null;
+      const chip = makeGroupChip(name, grp);
+      const target = grp ? `county-group-${grp}-chips` : 'county-unassigned-chips';
+      document.getElementById(target).appendChild(chip);
+    }
+  }
+
+  function makeGroupChip(name, grp) {
+    const chip = document.createElement('span');
+    chip.className = `candidate-chip${grp === 'a' ? ' selected-a' : grp === 'b' ? ' selected-b' : grp === 'c' ? ' selected-c' : ''}`;
+    chip.textContent = title(name);
+    chip.draggable = !!grp;
+
+    chip.addEventListener('click', () => {
+      if (grp === null)     { groupA.push(name); }
+      else if (grp === 'a') { groupA = groupA.filter(n => n !== name); groupB.push(name); }
+      else if (grp === 'b') { groupB = groupB.filter(n => n !== name); groupC.push(name); }
+      else                  { groupC = groupC.filter(n => n !== name); }
+      groupCache = null;
+      updateGroupPanel();
+      if (currentMode === 'group') renderMap();
+    });
+
+    chip.addEventListener('dragstart', e => { e.dataTransfer.setData('text/plain', name); e.dataTransfer.effectAllowed = 'move'; });
+    return chip;
+  }
+
+  function setupDropZones() {
+    [['county-drop-a','a'],['county-drop-b','b'],['county-drop-c','c'],['county-unassigned-chips',null]].forEach(([id, tgt]) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.addEventListener('dragover', e => e.preventDefault());
+      el.addEventListener('drop', e => {
+        e.preventDefault();
+        const name = e.dataTransfer.getData('text/plain');
+        if (!name) return;
+        groupA = groupA.filter(n => n !== name);
+        groupB = groupB.filter(n => n !== name);
+        groupC = groupC.filter(n => n !== name);
+        if (tgt === 'a') groupA.push(name);
+        else if (tgt === 'b') groupB.push(name);
+        else if (tgt === 'c') groupC.push(name);
+        groupCache = null;
+        updateGroupPanel();
+        if (currentMode === 'group') renderMap();
+      });
+    });
+  }
+
+  // ── Ordering panel ────────────────────────────────────────────
+
+  function buildOrderingPanel() {
+    const sel = document.getElementById('ordering-selected');
+    const avail = document.getElementById('ordering-available');
+    if (!sel) return;
+    sel.innerHTML = avail.innerHTML = '';
+    for (const name of orderingCands) sel.appendChild(makeOrderingChip(name, true));
+    for (const name of allCands(currentRace, currentParty))
+      if (!orderingCands.includes(name)) avail.appendChild(makeOrderingChip(name, false));
+  }
+
+  function makeOrderingChip(name, isSel) {
+    const chip = document.createElement('span');
+    chip.className = `candidate-chip${isSel ? ' selected-a' : ''}`;
+    if (isSel) {
+      const color = colorMap[name] || '#4f93d1';
+      chip.style.background = `${color}33`;
+      chip.style.borderColor = color;
+      chip.style.color = color;
+    }
+    chip.textContent = title(name);
+    if (isSel) {
+      chip.addEventListener('click', () => {
+        orderingCands = orderingCands.filter(n => n !== name);
+        orderingCache = null;
+        buildOrderingPanel();
+        if (currentMode === 'ordering') renderMap();
+      });
+    } else {
+      chip.addEventListener('click', () => {
+        if (orderingCands.length >= 3) return;
+        orderingCands.push(name);
+        orderingCache = null;
+        buildOrderingPanel();
+        if (currentMode === 'ordering') renderMap();
+      });
+    }
+    return chip;
+  }
+
+  // ── Map style ─────────────────────────────────────────────────
+
+  function countyStyle(feature) {
+    const geo = feature.properties.COUNTY_NAM;
+    const key = dataKey(geo);
+    const isSel = geo === selectedCounty;
+    const border = { color: isSel ? '#ffffff' : '#1c2330', weight: isSel ? 2.5 : 1 };
+
+    if (currentMode === 'heat' && heatCache) {
+      const d = heatCache.devs.get(key);
+      if (!d) return { ...border, fillColor: '#2a2a2a', fillOpacity: 0.15 };
+      const t = Math.min(Math.abs(d.dev) / heatCache.maxDev, 1);
+      return { ...border, fillColor: lerpColor('#1c2330', d.dev >= 0 ? '#4f93d1' : '#d16f4f', t), fillOpacity: 0.85 };
+    }
+
+    if (currentMode === 'group' && groupCache) {
+      const d = groupCache.get(key);
+      if (!d || d.total === 0) return { ...border, fillColor: '#2a2a2a', fillOpacity: 0.15 };
+      const win = d.c > d.a && d.c > d.b ? 'c' : d.a >= d.b ? 'a' : 'b';
+      const base = win === 'a' ? '#4f93d1' : win === 'b' ? '#d16f4f' : '#2ecc71';
+      const share = (win === 'a' ? d.a : win === 'b' ? d.b : d.c) / d.total;
+      return { ...border, fillColor: lerpColor('#2a3040', base, 0.3 + share * 0.7), fillOpacity: 0.85 };
+    }
+
+    if (currentMode === 'ordering' && orderingCache && orderingCands.length >= 2) {
+      const d = orderingCache.get(key);
+      if (!d || !d.ordering) return { ...border, fillColor: '#2a2a2a', fillOpacity: 0.15 };
+      const leaderIdx = parseInt(d.ordering[0]);
+      const shade = ORDERING_SHADES[d.ordering] ?? 0.7;
+      return { ...border, fillColor: lerpColor('#1c2330', ORDERING_LEADER_COLORS[leaderIdx] || '#888', shade), fillOpacity: 0.85 };
+    }
+
+    if (currentParty === 'COMPOSITE' && compositeCache) {
+      const d = compositeCache.get(key);
+      if (!d || !d.total) return { ...border, fillColor: '#2a2a2a', fillOpacity: 0.15 };
+      const demShare = d.dem / d.total;
+      const t = Math.min(Math.abs(demShare - 0.5) * 2, 1) * 0.8 + 0.15;
+      const color = demShare >= 0.5 ? lerpColor('#1c2330', '#4f93d1', t) : lerpColor('#1c2330', '#d16f4f', t);
+      return { ...border, fillColor: color, fillOpacity: 0.85 };
+    }
+
+    // Winner (default)
+    const w = getWinner(geo, currentRace, currentParty);
+    return { ...border, fillColor: w ? (colorMap[w.name] || '#555') : '#2a2a2a', fillOpacity: w ? 0.75 : 0.15 };
+  }
+
+  // ── Render ────────────────────────────────────────────────────
+
+  function updateLayerStyle(geo) {
+    if (!geojsonLayer) return;
+    geojsonLayer.eachLayer(l => {
+      if (l.feature.properties.COUNTY_NAM === geo) l.setStyle(countyStyle(l.feature));
+    });
+  }
+
+  function renderMap() {
+    if (geojsonLayer) geojsonLayer.remove();
+
+    if (currentMode === 'heat' && heatCandidate && !heatCache) heatCache = computeHeat(currentRace, currentParty, heatCandidate);
+    if (currentMode === 'group' && !groupCache && (groupA.length || groupB.length || groupC.length)) groupCache = computeGroup(currentRace, currentParty);
+    if (currentMode === 'ordering' && !orderingCache && orderingCands.length >= 2) orderingCache = computeOrdering(currentRace, currentParty);
+    if (currentParty === 'COMPOSITE' && !compositeCache) compositeCache = computeComposite(currentRace);
+
+    geojsonLayer = L.geoJSON(countiesGeo, {
+      style: countyStyle,
+      onEachFeature(feature, layer) {
+        const geo = feature.properties.COUNTY_NAM;
+        const tt = L.tooltip({ className: 'county-tt', sticky: true, direction: 'top', offset: [0, -4] });
+        layer.bindTooltip(tt);
+        layer.on('mouseover', () => {
+          layer.setStyle({ weight: 2, color: '#fff', fillOpacity: 0.9 });
+          tt.setContent(buildTooltip(geo));
+          layer.openTooltip();
+        });
+        layer.on('mouseout', () => {
+          const s = geo === selectedCounty;
+          layer.setStyle({ weight: s ? 2.5 : 1, color: s ? '#fff' : '#1c2330', fillOpacity: currentMode === 'winner' ? 0.75 : 0.85 });
+          layer.closeTooltip();
+        });
+        layer.on('click', () => {
+          const prev = selectedCounty;
+          selectedCounty = geo;
+          if (prev) updateLayerStyle(prev);
+          updateLayerStyle(geo);
+          showInfo(geo);
+        });
+      },
+    }).addTo(map);
+
+    renderLegend();
+    buildResultsTable();
+  }
+
+  // ── Tooltip ───────────────────────────────────────────────────
+
+  function buildTooltip(geo) {
+    const key = dataKey(geo);
+    const hdr = `<strong style="font-size:0.88em">${title(geo)} County</strong>`;
+
+    if (currentParty === 'COMPOSITE' && compositeCache) {
+      const d = compositeCache.get(key);
+      if (!d || !d.total) return `${hdr}<br><span style="color:#484f58;font-size:0.8em">No results</span>`;
+      return hdr +
+        ttRow('#4f93d1', 'Democratic', (d.dem / d.total * 100).toFixed(1)) +
+        ttRow('#d16f4f', 'Republican', (d.rep / d.total * 100).toFixed(1));
+    }
+
+    if (currentMode === 'heat' && heatCache) {
+      const d = heatCache.devs.get(key);
+      if (!d) return `${hdr}<br><span style="color:#484f58;font-size:0.8em">No results</span>`;
+      const devSign = d.dev >= 0 ? '+' : '';
+      const devColor = d.dev >= 0 ? '#4f93d1' : '#d16f4f';
+      return `${hdr}<div style="margin-top:5px;font-size:0.82em">${title(heatCandidate)}</div>
+        <div style="display:flex;gap:10px;margin-top:4px;font-size:0.8em">
+          <span>County: <b>${(d.pct*100).toFixed(1)}%</b></span>
+          <span>Avg: ${(d.avg*100).toFixed(1)}%</span>
+          <span style="color:${devColor}"><b>${devSign}${(d.dev*100).toFixed(1)}%</b></span>
+        </div>`;
+    }
+
+    if (currentMode === 'group' && groupCache) {
+      const d = groupCache.get(key);
+      if (!d || d.total === 0) return `${hdr}<br><span style="color:#484f58;font-size:0.8em">No results</span>`;
+      const gs = [
+        { label: groupA.join(' + ') || 'Group A', v: d.a, color: '#4f93d1' },
+        { label: groupB.join(' + ') || 'Group B', v: d.b, color: '#d16f4f' },
+        ...(groupC.length ? [{ label: groupC.join(' + '), v: d.c, color: '#2ecc71' }] : []),
+      ];
+      return hdr + gs.map(g => `<div style="display:flex;align-items:center;gap:7px;margin-top:4px">
+        <span style="width:8px;height:8px;border-radius:50%;background:${g.color};display:inline-block;flex-shrink:0"></span>
+        <span style="font-size:0.82em;flex:1">${title(g.label)}</span>
+        <span style="font-size:0.78em;color:#8b949e">${d.total > 0 ? (g.v/d.total*100).toFixed(1) : '0.0'}%</span>
+      </div>`).join('');
+    }
+
+    if (currentMode === 'ordering' && orderingCache && orderingCands.length >= 2) {
+      const d = orderingCache.get(key);
+      if (!d || !d.total) return `${hdr}<br><span style="color:#484f58;font-size:0.8em">No results</span>`;
+      return hdr + d.ranked.map(({ idx, votes }) => {
+        const pct = d.total > 0 ? (votes/d.total*100).toFixed(1) : '0.0';
+        const color = colorMap[orderingCands[idx]] || '#555';
+        return `<div style="display:flex;align-items:center;gap:7px;margin-top:4px">
+          <span style="width:8px;height:8px;border-radius:50%;background:${color};display:inline-block;flex-shrink:0"></span>
+          <span style="font-size:0.82em;flex:1">${title(orderingCands[idx])}</span>
+          <span style="font-size:0.78em;color:#8b949e">${pct}%</span>
+        </div>`;
+      }).join('');
+    }
+
+    // Default: winner
+    const cs = getCands(geo, currentRace, currentParty);
+    if (!cs.length) return `${hdr}<br><span style="color:#484f58;font-size:0.8em">No results</span>`;
+    const total = cs.reduce((s, c) => s + c.votes, 0);
+    return hdr + [...cs].sort((a,b) => b.votes-a.votes).slice(0,3).map(c => {
+      const color = colorMap[c.name] || '#555';
+      return `<div style="display:flex;align-items:center;gap:7px;margin-top:4px">
+        <span style="width:8px;height:8px;border-radius:50%;background:${color};display:inline-block;flex-shrink:0"></span>
+        <span style="font-size:0.82em;flex:1">${title(c.name)}</span>
+        <span style="font-size:0.78em;color:#8b949e">${total > 0 ? (c.votes/total*100).toFixed(1) : '0.0'}%</span>
+      </div>`;
+    }).join('');
+  }
+
+  // ── Legend ────────────────────────────────────────────────────
+
+  function renderLegend() {
+    const el = document.getElementById('county-legend');
+
+    if (currentParty === 'COMPOSITE') {
+      el.style.display = 'block';
+      el.innerHTML = `<div class="county-legend-title">Composite</div>
+        <div class="legend-row"><span class="legend-swatch" style="background:#4f93d1"></span><span class="legend-name">Democratic</span></div>
+        <div class="legend-row"><span class="legend-swatch" style="background:#d16f4f"></span><span class="legend-name">Republican</span></div>`;
+      return;
+    }
+
+    if (currentMode === 'heat' && heatCache) {
+      el.style.display = 'block';
+      el.innerHTML = `<div class="county-legend-title">Heat Map — ${title(heatCandidate)}</div>
+        <div class="legend-row"><span class="legend-swatch" style="background:#4f93d1"></span><span class="legend-name">Above average</span></div>
+        <div class="legend-row"><span class="legend-swatch" style="background:#1c2330;border:1px solid var(--border)"></span><span class="legend-name">At average</span></div>
+        <div class="legend-row"><span class="legend-swatch" style="background:#d16f4f"></span><span class="legend-name">Below average</span></div>`;
+      return;
+    }
+
+    if (currentMode === 'group' && groupCache) {
+      el.style.display = 'block';
+      const rows = [
+        [groupA.join(' + ') || 'Group A', '#4f93d1'],
+        [groupB.join(' + ') || 'Group B', '#d16f4f'],
+        ...(groupC.length ? [[groupC.join(' + '), '#2ecc71']] : []),
+      ].map(([lbl, col]) => `<div class="legend-row"><span class="legend-swatch" style="background:${col}"></span><span class="legend-name">${title(lbl)}</span></div>`).join('');
+      el.innerHTML = `<div class="county-legend-title">Head to Head</div>${rows}`;
+      return;
+    }
+
+    if (currentMode === 'ordering' && orderingCache && orderingCands.length >= 2) {
+      el.style.display = 'block';
+      const n = orderingCands.length;
+      const perms = n === 2 ? [[0,1],[1,0]] : [[0,1,2],[0,2,1],[1,0,2],[1,2,0],[2,0,1],[2,1,0]];
+      const rows = perms.map(p => {
+        const ord = p.join('');
+        const shade = ORDERING_SHADES[ord] ?? 0.7;
+        const color = lerpColor('#1c2330', ORDERING_LEADER_COLORS[p[0]] || '#888', shade);
+        return `<div class="legend-row"><span class="legend-swatch" style="background:${color}"></span>
+          <span class="legend-name" style="font-size:0.72rem">${p.map(i => title(orderingCands[i])).join(' → ')}</span></div>`;
+      }).join('');
+      el.innerHTML = `<div class="county-legend-title">Top 3 Order</div>${rows}`;
+      return;
+    }
+
+    // Winner mode
+    const wins = {};
+    for (const k of Object.keys(countyData)) {
+      if (k === 'TOTALS') continue;
+      const w = getWinner(k, currentRace, currentParty);
+      if (w) wins[w.name] = (wins[w.name] || 0) + 1;
+    }
+    if (!Object.keys(wins).length) { el.style.display = 'none'; return; }
+    el.style.display = 'block';
+    el.innerHTML = `<div class="county-legend-title">Winner by County</div>` +
+      Object.entries(wins).sort((a,b) => b[1]-a[1]).map(([name, cnt]) =>
+        `<div class="legend-row"><span class="legend-swatch" style="background:${colorMap[name]||'#555'}"></span>
+          <span class="legend-name">${title(name)} <span class="legend-count">(${cnt})</span></span></div>`
+      ).join('');
+  }
+
+  // ── Results table ─────────────────────────────────────────────
+
+  function renderTableHeaders(thead, headers) {
+    thead.innerHTML = `<tr>${headers.map((h, i) => {
+      const cls = tableSort.col === i ? ` class="th-sorted-${tableSort.dir}"` : '';
+      return `<th data-col="${i}"${cls}>${h}</th>`;
+    }).join('')}</tr>`;
+    thead.querySelectorAll('th').forEach(th => {
+      th.addEventListener('click', () => {
+        const col = +th.dataset.col;
+        tableSort.col === col
+          ? (tableSort.dir = tableSort.dir === 'asc' ? 'desc' : 'asc')
+          : (tableSort = { col, dir: col === 0 ? 'asc' : 'desc' });
+        buildResultsTable();
+      });
+    });
+  }
+
+  function sortTableRows(rows) {
+    if (tableSort.col === null) return rows;
+    const { col, dir } = tableSort;
+    return [...rows].sort((a, b) => {
+      const av = a.sv[col], bv = b.sv[col];
+      if (typeof av === 'string') return dir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
+      return dir === 'asc' ? av - bv : bv - av;
+    });
+  }
+
+  function setupTableDisplayToggle() {
+    document.querySelectorAll('#table-display-control .btn-toggle').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (btn.dataset.display === tableDisplay) return;
+        tableDisplay = btn.dataset.display;
+        tableSort = { col: null, dir: 'asc' };
+        document.querySelectorAll('#table-display-control .btn-toggle').forEach(b =>
+          b.classList.toggle('active', b.dataset.display === tableDisplay));
+        buildResultsTable();
+      });
+    });
+  }
+
+  function scopeLabel() { return STATEWIDE_ORDER.includes(currentRace) ? 'Statewide' : 'Districtwide'; }
+
+  function buildResultsTable() {
+    const thead = document.getElementById('county-table-head');
+    const tbody = document.getElementById('county-table-body');
+    if (!thead || !tbody) return;
+    if (classViewMode === 'regions') buildRegionResultsTable(thead, tbody);
+    else if (currentParty === 'COMPOSITE') buildCompositeResultsTable(thead, tbody);
+    else if (currentMode === 'group') buildGroupResultsTable(thead, tbody);
+    else buildCandResultsTable(thead, tbody);
+  }
+
+  function setupClassificationTabs() {
+    document.querySelectorAll('#table-view-control .btn-toggle').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (btn.dataset.view === classViewMode) return;
+        classViewMode = btn.dataset.view;
+        tableSort = { col: null, dir: 'asc' };
+        document.querySelectorAll('#table-view-control .btn-toggle').forEach(b =>
+          b.classList.toggle('active', b.dataset.view === classViewMode));
+        document.getElementById('class-groupby-wrap').style.display =
+          classViewMode === 'regions' ? 'flex' : 'none';
+        buildResultsTable();
+      });
+    });
+    document.querySelectorAll('#class-groupby-buttons .btn-toggle').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (btn.dataset.groupby === classGroupBy) return;
+        classGroupBy = btn.dataset.groupby;
+        tableSort = { col: null, dir: 'asc' };
+        document.querySelectorAll('#class-groupby-buttons .btn-toggle').forEach(b =>
+          b.classList.toggle('active', b.dataset.groupby === classGroupBy));
+        buildResultsTable();
+      });
+    });
+  }
+
+  function getClassification(k, dimension) {
+    const geoName = DATA_TO_GEO[k] || k;
+    const cls = classificationData?.[geoName];
+    if (!cls) return 'Unknown';
+    return cls[dimension] ?? 'Non-Metro';
+  }
+
+  function buildRegionResultsTable(thead, tbody) {
+    if (!classificationData) { tbody.innerHTML = ''; return; }
+    if (currentParty === 'COMPOSITE') buildRegionCompositeTable(thead, tbody);
+    else if (currentMode === 'group') buildRegionGroupTable(thead, tbody);
+    else buildRegionCandTable(thead, tbody);
+  }
+
+  function buildRegionCandTable(thead, tbody) {
+    let swTotal = 0;
+    const swVotes = {};
+    for (const k of Object.keys(countyData)) {
+      if (k === 'TOTALS') continue;
+      const cs = getCands(k, currentRace, currentParty);
+      cs.forEach(c => { swVotes[c.name] = (swVotes[c.name] || 0) + c.votes; });
+      swTotal += cs.reduce((s, c) => s + c.votes, 0);
+    }
+    const cands = allCands(currentRace, currentParty)
+      .filter(c => swTotal > 0 && (swVotes[c] || 0) / swTotal >= 0.01)
+      .sort((a, b) => (swVotes[b] || 0) - (swVotes[a] || 0));
+
+    renderTableHeaders(thead, ['Group', 'Total Votes', ...cands.map(c => title(c)), 'Margin']);
+
+    const groups = new Map();
+    for (const k of Object.keys(countyData)) {
+      if (k === 'TOTALS') continue;
+      const classVal = getClassification(k, classGroupBy);
+      if (!groups.has(classVal)) groups.set(classVal, { total: 0, votes: {} });
+      const grp = groups.get(classVal);
+      const cs = getCands(k, currentRace, currentParty);
+      grp.total += cs.reduce((s, c) => s + c.votes, 0);
+      cs.forEach(c => { grp.votes[c.name] = (grp.votes[c.name] || 0) + c.votes; });
+    }
+
+    const showPct = tableDisplay === 'pct';
+    const fmt = (v, t) => showPct ? `${(t > 0 ? v / t * 100 : 0).toFixed(1)}%` : v.toLocaleString();
+    const numVal = (v, t) => showPct ? (t > 0 ? v / t * 100 : 0) : v;
+
+    const swAllRanked = Object.entries(swVotes).sort((a, b) => b[1] - a[1]);
+    const swMargin = swAllRanked.length >= 2 && swTotal > 0
+      ? `${title(swAllRanked[0][0])} +${((swAllRanked[0][1] - swAllRanked[1][1]) / swTotal * 100).toFixed(1)}`
+      : '—';
+    const totalCells = [
+      `<td>Total</td>`,
+      `<td>${swTotal.toLocaleString()}</td>`,
+      ...cands.map(c => `<td>${fmt(swVotes[c] || 0, swTotal)}</td>`),
+      `<td>${swMargin}</td>`,
+    ];
+
+    const rows = [];
+    for (const [classVal, grp] of groups) {
+      const allRanked = Object.entries(grp.votes).sort((a, b) => b[1] - a[1]);
+      const margin = allRanked.length >= 2 && grp.total > 0
+        ? { display: `${title(allRanked[0][0])} +${((allRanked[0][1] - allRanked[1][1]) / grp.total * 100).toFixed(1)}`, sort: (allRanked[0][1] - allRanked[1][1]) / grp.total * 100 }
+        : { display: '—', sort: 0 };
+      const sv = [classVal, grp.total, ...cands.map(c => numVal(grp.votes[c] || 0, grp.total)), margin.sort];
+      const cells = [
+        `<td>${classVal}</td>`,
+        `<td>${grp.total.toLocaleString()}</td>`,
+        ...cands.map(c => `<td>${fmt(grp.votes[c] || 0, grp.total)}</td>`),
+        `<td>${margin.display}</td>`,
+      ];
+      rows.push({ sv, cells });
+    }
+
+    const sorted = tableSort.col !== null ? sortTableRows(rows) : [...rows].sort((a, b) => b.sv[1] - a.sv[1]);
+    tbody.innerHTML = `<tr class="statewide-row">${totalCells.join('')}</tr>` +
+      sorted.map(r => `<tr>${r.cells.join('')}</tr>`).join('');
+  }
+
+  function buildRegionGroupTable(thead, tbody) {
+    const hasC = groupC.length > 0;
+    const colCount = 3 + (hasC ? 1 : 0) + 2;
+    renderTableHeaders(thead, ['Group', 'Total Votes',
+      'Group A', 'Group B', ...(hasC ? ['Group C'] : []), 'Margin']);
+
+    if (!groupA.length || !groupB.length) {
+      tbody.innerHTML = `<tr><td colspan="${colCount}" style="text-align:center;color:var(--text-muted);padding:20px;font-size:0.8rem">Assign candidates to Group A and Group B to see results.</td></tr>`;
+      return;
+    }
+
+    function grpMargin(a, b, c, total) {
+      if (!total) return { display: '—', sort: 0 };
+      const comps = [
+        { label: 'Group A', pct: a / total * 100 },
+        { label: 'Group B', pct: b / total * 100 },
+        ...(hasC ? [{ label: 'Group C', pct: c / total * 100 }] : []),
+      ].sort((x, y) => y.pct - x.pct);
+      const margin = comps[0].pct - comps[1].pct;
+      const sign = comps[0].label === 'Group A' ? 1 : comps[0].label === 'Group B' ? -1 : 0;
+      return { display: `${comps[0].label} +${margin.toFixed(1)}`, sort: sign * margin };
+    }
+
+    const showPct = tableDisplay === 'pct';
+    const fmt = (v, t) => showPct ? `${(t > 0 ? v / t * 100 : 0).toFixed(1)}%` : v.toLocaleString();
+    const numVal = (v, t) => showPct ? (t > 0 ? v / t * 100 : 0) : v;
+
+    const groups = new Map();
+    let swA = 0, swB = 0, swC = 0, swTotal = 0;
+    for (const k of Object.keys(countyData)) {
+      if (k === 'TOTALS') continue;
+      const classVal = getClassification(k, classGroupBy);
+      if (!groups.has(classVal)) groups.set(classVal, { a: 0, b: 0, c: 0, total: 0 });
+      const grp = groups.get(classVal);
+      const cs = getCands(k, currentRace, currentParty);
+      const sum = arr => arr.reduce((s, n) => s + (cs.find(c => c.name === n)?.votes || 0), 0);
+      const a = sum(groupA), b = sum(groupB), c = sum(groupC);
+      grp.a += a; grp.b += b; grp.c += c; grp.total += a + b + c;
+      swA += a; swB += b; swC += c; swTotal += a + b + c;
+    }
+
+    const swMarg = grpMargin(swA, swB, swC, swTotal);
+    const totalCells = [
+      `<td>Total</td>`, `<td>${swTotal.toLocaleString()}</td>`,
+      `<td>${fmt(swA, swTotal)}</td>`, `<td>${fmt(swB, swTotal)}</td>`,
+      ...(hasC ? [`<td>${fmt(swC, swTotal)}</td>`] : []),
+      `<td>${swMarg.display}</td>`,
+    ];
+
+    const rows = [];
+    for (const [classVal, grp] of groups) {
+      const marg = grpMargin(grp.a, grp.b, grp.c, grp.total);
+      const sv = [classVal, grp.total, numVal(grp.a, grp.total), numVal(grp.b, grp.total)];
+      if (hasC) sv.push(numVal(grp.c, grp.total));
+      sv.push(marg.sort);
+      const cells = [
+        `<td>${classVal}</td>`, `<td>${grp.total.toLocaleString()}</td>`,
+        `<td>${fmt(grp.a, grp.total)}</td>`, `<td>${fmt(grp.b, grp.total)}</td>`,
+        ...(hasC ? [`<td>${fmt(grp.c, grp.total)}</td>`] : []),
+        `<td>${marg.display}</td>`,
+      ];
+      rows.push({ sv, cells });
+    }
+
+    const sorted = tableSort.col !== null ? sortTableRows(rows) : [...rows].sort((a, b) => b.sv[1] - a.sv[1]);
+    tbody.innerHTML = `<tr class="statewide-row">${totalCells.join('')}</tr>` +
+      sorted.map(r => `<tr>${r.cells.join('')}</tr>`).join('');
+  }
+
+  function buildRegionCompositeTable(thead, tbody) {
+    renderTableHeaders(thead, ['Group', 'Total Votes', 'Democratic', 'Republican', 'Margin']);
+    if (!compositeCache) { tbody.innerHTML = ''; return; }
+
+    const showPct = tableDisplay === 'pct';
+    const fmt = (v, t) => showPct ? `${(t > 0 ? v / t * 100 : 0).toFixed(1)}%` : v.toLocaleString();
+    const numVal = (v, t) => showPct ? (t > 0 ? v / t * 100 : 0) : v;
+
+    function cmpMargin(dem, rep, total) {
+      if (!total) return { display: '—', sort: 0 };
+      const margin = Math.abs(dem - rep) / total * 100;
+      return { display: `${dem >= rep ? 'Dem' : 'Rep'} +${margin.toFixed(1)}`, sort: (dem >= rep ? 1 : -1) * margin };
+    }
+
+    const groups = new Map();
+    let swDem = 0, swRep = 0;
+    for (const [k, d] of compositeCache) {
+      const classVal = getClassification(k, classGroupBy);
+      if (!groups.has(classVal)) groups.set(classVal, { dem: 0, rep: 0 });
+      const grp = groups.get(classVal);
+      grp.dem += d.dem; grp.rep += d.rep;
+      swDem += d.dem; swRep += d.rep;
+    }
+    const swTotal = swDem + swRep;
+    const swMarg = cmpMargin(swDem, swRep, swTotal);
+    const totalCells = [
+      `<td>Total</td>`, `<td>${swTotal.toLocaleString()}</td>`,
+      `<td>${fmt(swDem, swTotal)}</td>`, `<td>${fmt(swRep, swTotal)}</td>`,
+      `<td>${swMarg.display}</td>`,
+    ];
+
+    const rows = [];
+    for (const [classVal, grp] of groups) {
+      const total = grp.dem + grp.rep;
+      const marg = cmpMargin(grp.dem, grp.rep, total);
+      const sv = [classVal, total, numVal(grp.dem, total), numVal(grp.rep, total), marg.sort];
+      const cells = [
+        `<td>${classVal}</td>`, `<td>${total.toLocaleString()}</td>`,
+        `<td>${fmt(grp.dem, total)}</td>`, `<td>${fmt(grp.rep, total)}</td>`,
+        `<td>${marg.display}</td>`,
+      ];
+      rows.push({ sv, cells });
+    }
+
+    const sorted = tableSort.col !== null ? sortTableRows(rows) : [...rows].sort((a, b) => b.sv[1] - a.sv[1]);
+    tbody.innerHTML = `<tr class="statewide-row">${totalCells.join('')}</tr>` +
+      sorted.map(r => `<tr>${r.cells.join('')}</tr>`).join('');
+  }
+
+  function buildCompositeResultsTable(thead, tbody) {
+    renderTableHeaders(thead, ['County', 'Total Votes', 'Democratic', 'Republican', 'Margin']);
+    if (!compositeCache) { tbody.innerHTML = ''; return; }
+
+    const showPct = tableDisplay === 'pct';
+    const fmt = (v, t) => showPct ? `${(t > 0 ? v / t * 100 : 0).toFixed(1)}%` : v.toLocaleString();
+    const numVal = (v, t) => showPct ? (t > 0 ? v / t * 100 : 0) : v;
+
+    function cmpMargin(dem, rep, total) {
+      if (!total) return { display: '—', sort: 0 };
+      const margin = Math.abs(dem - rep) / total * 100;
+      const sign = dem >= rep ? 1 : -1;
+      return { display: `${dem >= rep ? 'Dem' : 'Rep'} +${margin.toFixed(1)}`, sort: sign * margin };
+    }
+
+    let swDem = 0, swRep = 0;
+    for (const d of compositeCache.values()) { swDem += d.dem; swRep += d.rep; }
+    const swTotal = swDem + swRep;
+    const swMarg = cmpMargin(swDem, swRep, swTotal);
+    const swCells = [
+      `<td>${scopeLabel()}</td>`,
+      `<td>${swTotal.toLocaleString()}</td>`,
+      `<td>${fmt(swDem, swTotal)}</td>`,
+      `<td>${fmt(swRep, swTotal)}</td>`,
+      `<td>${swMarg.display}</td>`,
+    ];
+
+    const rows = [];
+    for (const [k, d] of compositeCache) {
+      if (d.total === 0) continue;
+      const marg = cmpMargin(d.dem, d.rep, d.total);
+      const sv = [k, d.total, numVal(d.dem, d.total), numVal(d.rep, d.total), marg.sort];
+      const cells = [
+        `<td>${displayCounty(k)}</td>`,
+        `<td>${d.total.toLocaleString()}</td>`,
+        `<td>${fmt(d.dem, d.total)}</td>`,
+        `<td>${fmt(d.rep, d.total)}</td>`,
+        `<td>${marg.display}</td>`,
+      ];
+      rows.push({ sv, cells });
+    }
+
+    tbody.innerHTML = `<tr class="statewide-row">${swCells.join('')}</tr>` +
+      sortTableRows(rows).map(r => `<tr>${r.cells.join('')}</tr>`).join('');
+  }
+
+  function buildCandResultsTable(thead, tbody) {
+    // Statewide totals first — drives candidate ordering and 1% filter
+    let swTotal = 0;
+    const swVotes = {};
+    for (const k of Object.keys(countyData)) {
+      if (k === 'TOTALS') continue;
+      const cs = getCands(k, currentRace, currentParty);
+      cs.forEach(c => { swVotes[c.name] = (swVotes[c.name] || 0) + c.votes; });
+      swTotal += cs.reduce((s, c) => s + c.votes, 0);
+    }
+
+    const cands = allCands(currentRace, currentParty)
+      .filter(c => swTotal > 0 && (swVotes[c] || 0) / swTotal >= 0.01)
+      .sort((a, b) => (swVotes[b] || 0) - (swVotes[a] || 0));
+
+    renderTableHeaders(thead, ['County', 'Total Votes', ...cands.map(c => title(c)), 'Margin']);
+
+    const showPct = tableDisplay === 'pct';
+    const fmt = (v, t) => showPct ? `${(t > 0 ? v / t * 100 : 0).toFixed(1)}%` : v.toLocaleString();
+    const numVal = (v, t) => showPct ? (t > 0 ? v / t * 100 : 0) : v;
+
+    // Statewide margin using full candidate pool (not just ≥1% filtered)
+    const swAllRanked = Object.entries(swVotes).sort((a, b) => b[1] - a[1]);
+    const swMargin = swAllRanked.length >= 2 && swTotal > 0
+      ? { display: `${title(swAllRanked[0][0])} +${((swAllRanked[0][1] - swAllRanked[1][1]) / swTotal * 100).toFixed(1)}`, sort: (swAllRanked[0][1] - swAllRanked[1][1]) / swTotal * 100 }
+      : { display: '—', sort: 0 };
+
+    const swCells = [
+      `<td>${scopeLabel()}</td>`,
+      `<td>${swTotal.toLocaleString()}</td>`,
+      ...cands.map(c => `<td>${fmt(swVotes[c] || 0, swTotal)}</td>`),
+      `<td>${swMargin.display}</td>`,
+    ];
+
+    const rows = [];
+    for (const k of Object.keys(countyData)) {
+      if (k === 'TOTALS') continue;
+      const cs = getCands(k, currentRace, currentParty);
+      const tot = cs.reduce((s, c) => s + c.votes, 0);
+      if (tot === 0) continue;
+      const vmap = Object.fromEntries(cs.map(c => [c.name, c.votes]));
+      const ranked = [...cs].sort((a, b) => b.votes - a.votes);
+      const margin = ranked.length >= 2 && tot > 0
+        ? { display: `${title(ranked[0].name)} +${((ranked[0].votes - ranked[1].votes) / tot * 100).toFixed(1)}`, sort: (ranked[0].votes - ranked[1].votes) / tot * 100 }
+        : { display: '—', sort: 0 };
+      const sv = [k, tot, ...cands.map(c => numVal(vmap[c] || 0, tot)), margin.sort];
+      const cells = [
+        `<td>${displayCounty(k)}</td>`,
+        `<td>${tot.toLocaleString()}</td>`,
+        ...cands.map(c => `<td>${fmt(vmap[c] || 0, tot)}</td>`),
+        `<td>${margin.display}</td>`,
+      ];
+      rows.push({ sv, cells });
+    }
+
+    tbody.innerHTML = `<tr class="statewide-row">${swCells.join('')}</tr>` +
+      sortTableRows(rows).map(r => `<tr>${r.cells.join('')}</tr>`).join('');
+  }
+
+  function buildGroupResultsTable(thead, tbody) {
+    const hasC = groupC.length > 0;
+    const colCount = 3 + (hasC ? 1 : 0) + 2; // County + Total + A + B + [C] + Margin
+    renderTableHeaders(thead, ['County', 'Total Votes',
+      'Group A', 'Group B', ...(hasC ? ['Group C'] : []), 'Margin']);
+
+    if (!groupA.length || !groupB.length) {
+      tbody.innerHTML = `<tr><td colspan="${colCount}" style="text-align:center;color:var(--text-muted);padding:20px;font-size:0.8rem">Assign candidates to Group A and Group B to see results.</td></tr>`;
+      return;
+    }
+
+    function grpMargin(a, b, c, total) {
+      if (!total) return { display: '—', sort: 0 };
+      const comps = [
+        { label: 'Group A', pct: a / total * 100 },
+        { label: 'Group B', pct: b / total * 100 },
+        ...(hasC ? [{ label: 'Group C', pct: c / total * 100 }] : []),
+      ].sort((x, y) => y.pct - x.pct);
+      const margin = comps[0].pct - comps[1].pct;
+      const sign = comps[0].label === 'Group A' ? 1 : comps[0].label === 'Group B' ? -1 : 0;
+      return { display: `${comps[0].label} +${margin.toFixed(1)}`, sort: sign * margin };
+    }
+
+    const showPct = tableDisplay === 'pct';
+    const fmt = (v, t) => showPct ? `${(t > 0 ? v / t * 100 : 0).toFixed(1)}%` : v.toLocaleString();
+    const numVal = (v, t) => showPct ? (t > 0 ? v / t * 100 : 0) : v;
+
+    let swA = 0, swB = 0, swC = 0, swTotal = 0;
+    for (const k of Object.keys(countyData)) {
+      if (k === 'TOTALS') continue;
+      const cs = getCands(k, currentRace, currentParty);
+      const sum = arr => arr.reduce((s, n) => s + (cs.find(c => c.name === n)?.votes || 0), 0);
+      const a = sum(groupA), b = sum(groupB), c = sum(groupC);
+      swA += a; swB += b; swC += c; swTotal += a + b + c;
+    }
+    const swMarg = grpMargin(swA, swB, swC, swTotal);
+    const swCells = [
+      `<td>${scopeLabel()}</td>`,
+      `<td>${swTotal.toLocaleString()}</td>`,
+      `<td>${fmt(swA, swTotal)}</td>`,
+      `<td>${fmt(swB, swTotal)}</td>`,
+      ...(hasC ? [`<td>${fmt(swC, swTotal)}</td>`] : []),
+      `<td>${swMarg.display}</td>`,
+    ];
+
+    const rows = [];
+    for (const k of Object.keys(countyData)) {
+      if (k === 'TOTALS') continue;
+      const cs = getCands(k, currentRace, currentParty);
+      if (cs.reduce((s, c) => s + c.votes, 0) === 0) continue;
+      const sum = arr => arr.reduce((s, n) => s + (cs.find(c => c.name === n)?.votes || 0), 0);
+      const a = sum(groupA), b = sum(groupB), c = sum(groupC);
+      const total = a + b + c;
+      const marg = grpMargin(a, b, c, total);
+      const sv = [k, total, numVal(a, total), numVal(b, total)];
+      if (hasC) sv.push(numVal(c, total));
+      sv.push(marg.sort);
+      const cells = [
+        `<td>${displayCounty(k)}</td>`,
+        `<td>${total.toLocaleString()}</td>`,
+        `<td>${fmt(a, total)}</td>`,
+        `<td>${fmt(b, total)}</td>`,
+        ...(hasC ? [`<td>${fmt(c, total)}</td>`] : []),
+        `<td>${marg.display}</td>`,
+      ];
+      rows.push({ sv, cells });
+    }
+
+    tbody.innerHTML = `<tr class="statewide-row">${swCells.join('')}</tr>` +
+      sortTableRows(rows).map(r => `<tr>${r.cells.join('')}</tr>`).join('');
+  }
+
+  // ── Info panel ────────────────────────────────────────────────
+
+  function showInfo(geo) {
+    const key = dataKey(geo);
+    document.getElementById('county-info-name').textContent = title(geo) + ' County';
+    document.getElementById('county-info-race').textContent = title(currentRace);
+    const resultsEl = document.getElementById('county-info-results');
+
+    if (currentParty === 'COMPOSITE' && compositeCache) {
+      const d = compositeCache.get(key);
+      if (!d || !d.total) {
+        resultsEl.innerHTML = '<div style="color:var(--text-muted);font-size:0.8rem;padding:8px 0">No results for this race in this county.</div>';
+      } else {
+        const rows = [
+          { color: '#4f93d1', label: 'Democratic', votes: d.dem, total: d.total },
+          { color: '#d16f4f', label: 'Republican',  votes: d.rep, total: d.total },
+        ];
+        resultsEl.innerHTML = rows.map((r, i) => `
+          <div class="county-cand-row">
+            <span class="cand-color-dot" style="background:${r.color}"></span>
+            <span class="cand-name${i===0&&d.dem>d.rep?' winner':i===1&&d.rep>d.dem?' winner':''}">${r.label}</span>
+            <span class="cand-votes">${r.votes.toLocaleString()}</span>
+            <span class="cand-pct">${(r.votes/r.total*100).toFixed(1)}%</span>
+          </div>`).join('');
+      }
+      document.getElementById('county-info').classList.add('visible');
+      return;
+    }
+
+    const cs = getCands(geo, currentRace, currentParty);
+    if (!cs.length) {
+      resultsEl.innerHTML = '<div style="color:var(--text-muted);font-size:0.8rem;padding:8px 0">No results for this race in this county.</div>';
+    } else {
+      const total = cs.reduce((s, c) => s + c.votes, 0);
+      resultsEl.innerHTML = [...cs].sort((a,b) => b.votes-a.votes).map((c, i) => `
+        <div class="county-cand-row">
+          <span class="cand-color-dot" style="background:${colorMap[c.name]||'#555'}"></span>
+          <span class="cand-name${i===0?' winner':''}">${title(c.name)}</span>
+          <span class="cand-votes">${c.votes.toLocaleString()}</span>
+          <span class="cand-pct">${total > 0 ? (c.votes/total*100).toFixed(1) : '0.0'}%</span>
+        </div>`).join('');
+    }
+    document.getElementById('county-info').classList.add('visible');
+  }
+
+  function closeInfo() {
+    selectedCounty = null;
+    document.getElementById('county-info').classList.remove('visible');
+  }
+
+  // ── Init ──────────────────────────────────────────────────────
+
+  async function init() {
+    map = L.map('county-map', { center: [40.1, -89.3], zoom: 7, zoomSnap: 0.5 });
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors', maxZoom: 19,
+    }).addTo(map);
+
+    const [geoRes, dataRes, classRes] = await Promise.all([
+      fetch(GEOJSON_PATH), fetch(DATA_PATH), fetch(CLASSIFICATIONS_PATH),
+    ]);
+    countiesGeo        = await geoRes.json();
+    countyData         = await dataRes.json();
+    classificationData = await classRes.json();
+
+    buildRaceDropdown();
+    setupPartyToggle();
+    setupModeButtons();
+    setupTableDisplayToggle();
+    setupClassificationTabs();
+    buildColorMap(currentRace, currentParty);
+    updateModeVisibility();
+    buildHeatSelect();
+    setupDropZones();
+    renderMap();
+
+    map.fitBounds(geojsonLayer.getBounds(), { padding: [24, 24] });
+
+    document.getElementById('county-info-close').addEventListener('click', () => {
+      const prev = selectedCounty;
+      closeInfo();
+      if (prev) updateLayerStyle(prev);
+    });
+  }
+
+  init().catch(err => console.error('County map init failed:', err));
+})();
+</script>
+
+</body>
+</html>
