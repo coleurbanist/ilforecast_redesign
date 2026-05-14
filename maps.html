@@ -63,16 +63,69 @@
     .legend-swatch {
       width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0;
     }
+    .geo-select-wrap { position: relative; }
+    .geo-select-btn {
+      background: var(--bg-raised); border: 1px solid var(--border);
+      border-radius: 6px; color: var(--text-primary);
+      font-size: 0.8rem; font-family: var(--font-body);
+      padding: 4px 24px 4px 10px; cursor: pointer;
+      min-width: 120px; text-align: left; position: relative;
+    }
+    .geo-select-btn::after {
+      content: '▾'; position: absolute; right: 8px; top: 50%;
+      transform: translateY(-50%); color: var(--text-muted);
+      pointer-events: none;
+    }
+    .geo-select-panel {
+      position: absolute; top: calc(100% + 4px); left: 0; z-index: 500;
+      background: var(--bg-raised); border: 1px solid var(--border);
+      border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+      width: 220px; display: flex; flex-direction: column; max-height: 280px;
+    }
+    .geo-select-search { padding: 8px; border-bottom: 1px solid var(--border); }
+    .geo-select-search input {
+      width: 100%; box-sizing: border-box; background: var(--bg-base);
+      border: 1px solid var(--border); border-radius: 4px;
+      color: var(--text-primary); font-family: var(--font-body);
+      font-size: 0.8rem; padding: 5px 8px; outline: none;
+    }
+    .geo-select-options { overflow-y: auto; flex: 1; }
+    .geo-select-opt {
+      display: block; width: 100%; text-align: left;
+      padding: 7px 12px; background: none; border: none;
+      cursor: pointer; font-size: 0.8rem; font-family: var(--font-body);
+      color: var(--text-primary); white-space: nowrap;
+    }
+    .geo-select-opt:hover { background: rgba(255,255,255,0.05); }
+    .geo-select-opt.active { color: var(--accent); font-weight: 600; }
+
+    /* ── Layout overrides ── */
+    .maps-layout {
+      display: flex; flex-direction: column; align-items: stretch; gap: 16px;
+      grid-template-columns: unset;
+    }
+    .maps-controls {
+      background: var(--bg-surface); border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 8px 16px; display: flex; flex-wrap: wrap; align-items: center;
+      gap: 10px; flex-shrink: 0;
+    }
+    .maps-controls-title {
+      font-size: 0.9rem; font-weight: 600; color: var(--text-primary); margin-right: 4px;
+    }
+    #race-select {
+      background: transparent; border: none; color: var(--text-primary);
+      font-family: var(--font-body); font-size: 0.8rem;
+      cursor: pointer; outline: none; max-width: 280px;
+    }
+    #race-select option, #race-select optgroup { background: var(--bg-raised); color: var(--text-primary); }
+    .maps-below { display: flex; flex-direction: column; gap: 16px; }
+
     @media (max-width: 960px) {
-  .leaflet-control-zoom {
-    margin-left: auto !important;
-    margin-right: 8px !important;
-  }
-  .leaflet-top.leaflet-left {
-    left: auto !important;
-    right: 0 !important;
-  }
-}
+      .maps-controls { gap: 6px; padding: 6px 12px; }
+      #map-container { height: 360px; }
+      #race-select { max-width: 180px; }
+    }
   </style>
 </head>
 <body>
@@ -83,54 +136,53 @@
   <div class="loading-sub">This may take a moment on first load</div>
 </div>
 
-<div class="page-content">
+<div class="page-content" style="padding-top:24px;padding-bottom:24px">
   <div class="maps-layout">
 
-    <aside class="maps-sidebar">
-      <div style="padding:4px 8px 8px">
-        <input id="race-search" type="text" placeholder="Search races…" autocomplete="off"
-          style="width:100%;background:var(--bg-raised);border:1px solid var(--border);
-                 border-radius:6px;padding:7px 10px;color:var(--text-primary);
-                 font-size:0.8rem;font-family:var(--font-body);outline:none;">
-      </div>
-      <div id="race-list"></div>
-    </aside>
+    <!-- Controls bar -->
+    <div class="maps-controls">
+      <span class="maps-controls-title">2026 Illinois Primary</span>
 
-    <main class="map-main">
-
-      <div class="sidebar-overlay" id="sidebar-overlay"></div>
-
-      <div class="map-header">
-        <div style="display:flex;align-items:center;gap:10px;">
-          <button class="sidebar-toggle-btn" id="sidebar-toggle">☰ Races</button>
-          <div id="map-title" class="map-title">Select a race</div>
-        </div>
-        <div id="map-subtitle" class="map-subtitle">Choose a race from the sidebar to get started</div>
+      <div class="control-group">
+        <span class="control-label">Race</span>
+        <select id="race-select"></select>
       </div>
 
-      <div class="map-controls" id="map-controls" style="display:none">
-        <div class="control-group">
-          <span class="control-label">View</span>
-          <button class="btn-toggle active" data-mode="winner">Winner Map</button>
-          <button class="btn-toggle" data-mode="heat">Heat Map</button>
-          <button class="btn-toggle" data-mode="group">Head to Head</button>
-          <button class="btn-toggle" data-mode="ordering" id="btn-ordering">Top 3</button>
-        </div>
-        <div class="control-group" id="heat-candidate-control" style="display:none">
-          <span class="control-label">Candidate</span>
-          <select id="heat-candidate-select"
-            style="background:var(--bg-raised);border:none;color:var(--text-primary);
-                   font-family:var(--font-body);font-size:0.8rem;padding:4px 8px;
-                   border-radius:5px;cursor:pointer;outline:none;"></select>
-        </div>
-        <div class="control-group" id="geo-filter-control" style="display:none">
-          <span class="control-label">Area</span>
-          <div id="geo-filter-chips" style="display:flex;flex-wrap:wrap;gap:4px;"></div>
-        </div>
+      <div class="control-group" id="party-control">
+        <span class="control-label">Party</span>
+        <button class="btn-toggle active" data-party="DEM">Dem</button>
+        <button class="btn-toggle" data-party="GOP">Rep</button>
+        <button class="btn-toggle" data-party="COMPOSITE">Composite</button>
       </div>
 
+      <div class="control-group" id="map-controls" style="display:none">
+        <span class="control-label">View</span>
+        <button class="btn-toggle active" data-mode="winner">Winner</button>
+        <button class="btn-toggle" data-mode="heat">Heat Map</button>
+        <button class="btn-toggle" data-mode="group">Head to Head</button>
+        <button class="btn-toggle" data-mode="ordering" id="btn-ordering">Top 3</button>
+      </div>
+
+      <div class="control-group" id="heat-candidate-control" style="display:none">
+        <span class="control-label">Candidate</span>
+        <select id="heat-candidate-select"
+          style="background:var(--bg-raised);border:none;color:var(--text-primary);
+                 font-family:var(--font-body);font-size:0.8rem;padding:4px 8px;
+                 border-radius:5px;cursor:pointer;outline:none;"></select>
+      </div>
+
+      <div class="control-group" id="geo-filter-control" style="display:none">
+        <span class="control-label">Area</span>
+        <div id="geo-filter-chips"></div>
+      </div>
+    </div>
+
+    <!-- Map -->
+    <div id="map-container"></div>
+
+    <!-- Everything below the map -->
+    <div class="maps-below">
       <div class="map-legend" id="map-legend"></div>
-      <div id="map-container"></div>
 
       <div id="ordering-panel" style="display:none">
         <h3>Top 3 — Pick up to 3 Candidates</h3>
@@ -175,19 +227,20 @@
         <div class="stats-section-title" id="stats-title">District-Wide Results</div>
         <div class="stats-grid" id="stats-grid"></div>
       </div>
+    </div>
 
-    </main>
   </div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
 <script src="data.js"></script>
 <script src="map.js"></script>
 <script src="ui.js"></script>
 <script src="nav.js"></script>
 <script>
   const JSON_PATH    = 'data/election_csvs/clean/2026/Primary/2026_primary.json';
-  const GEOJSON_PATH = 'data/election_shapefiles/IL24_slim.geojson';
+  const GEOJSON_PATH = 'data/election_shapefiles/IL24_full.geojson';
 
   ElectionData.load(JSON_PATH, GEOJSON_PATH)
     .then(() => {
@@ -196,48 +249,13 @@
       const overlay = document.getElementById('loading-overlay');
       overlay.classList.add('hidden');
       setTimeout(() => overlay.remove(), 500);
-      setTimeout(() => {
-        if (ElectionMap.map && window.innerWidth <= 960) ElectionMap.map.invalidateSize();
-      }, 100);
+      setTimeout(() => ElectionMap.map && ElectionMap.map.invalidateSize(), 50);
     })
-  
     .catch(err => {
       console.error('Failed to load data:', err);
       document.querySelector('.loading-text').textContent = 'Failed to load data.';
       document.querySelector('.loading-sub').textContent  = 'Check the browser console for details.';
     });
-
-  // Mobile sidebar toggle
-  const sidebarToggle  = document.getElementById('sidebar-toggle');
-  const sidebar        = document.querySelector('.maps-sidebar');
-  const sidebarOverlay = document.getElementById('sidebar-overlay');
-
-  function openSidebar() {
-    sidebar.classList.add('sidebar-open');
-    sidebarOverlay.classList.add('active');
-  }
-  function closeSidebar() {
-    sidebar.classList.remove('sidebar-open');
-    sidebarOverlay.classList.remove('active');
-    // Tell Leaflet to recalculate its size after sidebar animation
-    setTimeout(() => {
-      if (ElectionMap.map) ElectionMap.map.invalidateSize();
-    }, 300);
-  }
-
-  sidebarToggle.addEventListener('click', () => {
-    sidebar.classList.contains('sidebar-open') ? closeSidebar() : openSidebar();
-  });
-  sidebarOverlay.addEventListener('click', closeSidebar);
-
-  // Auto-close sidebar when a race is selected on mobile
-  document.getElementById('race-list').addEventListener('click', e => {
-    if (e.target.closest('.sidebar-race-btn') && window.innerWidth <= 960) {
-      closeSidebar();
-      const btn = e.target.closest('.sidebar-race-btn');
-      sidebarToggle.textContent = '☰ ' + btn.textContent.trim();
-    }
-  });
 </script>
 
 </body>

@@ -14,76 +14,128 @@ const ElectionUI = (() => {
   let _groupB             = [];
   let _groupC             = [];
   let _orderingCandidates = [];
+  let _currentParty       = 'DEM';
   let _currentJurisdictions = null;
+  let _currentJurLabel    = null;
   let _allJurisdictions   = [];
+  let _geoPanel           = null;
+
+  const CITY_MERGE = {
+    'CITY OF GALESBURG':      'KNOX',
+    'CITY OF DANVILLE':       'VERMILION',
+    'CITY OF BLOOMINGTON':    'MCLEAN',
+    'CITY OF EAST ST. LOUIS': 'ST. CLAIR',
+  };
 
   // ── Init ──────────────────────────────────────────────────────────────────
 
   function init() {
-    _buildRaceList();
+    _buildRaceSelect();
+    _bindPartyButtons();
     _bindModeButtons();
-    _bindSearchBox();
+    document.addEventListener('click', e => {
+      if (_geoPanel && !_geoPanel.closest('.geo-select-wrap').contains(e.target)) {
+        _geoPanel.style.display = 'none';
+        _geoPanel = null;
+      }
+    });
   }
 
-  // ── Race sidebar ──────────────────────────────────────────────────────────
+  // ── Race select (top bar) ─────────────────────────────────────────────────
 
-  function _buildRaceList(filter = '') {
-    const races = ElectionData.getRaces();
-    const list  = document.getElementById('race-list');
-    list.innerHTML = '';
+  function _formatRaceOption(raceName) {
+    const s = raceName
+      .replace(/_(DEM|GOP)_Primary$/, '')
+      .replace(/^Illinois_/, '')
+      .replace(/^State_(House|Senate)_District_/, 'District ')
+      .replace(/^Cook_County_/, '')
+      .replace(/_/g, ' ');
+    if (s === 'Senate') return 'U.S. Senate';
+    return s;
+  }
 
+  function _districtNum(raceName) {
+    let m = raceName.match(/_District_(\d+)_/i);
+    if (m) return parseInt(m[1], 10);
+    m = raceName.match(/Illinois_(\d+)(?:st|nd|rd|th)_/i);
+    if (m) return parseInt(m[1], 10);
+    return null;
+  }
+
+  function _buildRaceSelect() {
+    const sel = document.getElementById('race-select');
+    if (!sel) return;
+    sel.innerHTML = '';
+
+    const partyLabel = (_currentParty === 'GOP') ? 'Republican' : 'Democrat';
+    const races = ElectionData.getRaces().filter(r => r.party === partyLabel);
+
+    const CAT_ORDER = ['Statewide', 'Congressional', 'State Senate', 'State House', 'Cook County'];
     const grouped = {};
     for (const r of races) {
-      if (filter && !r.raceName.toLowerCase().includes(filter.toLowerCase())) continue;
-      const key = `${r.party}__${r.category}`;
-      if (!grouped[key]) grouped[key] = { party: r.party, category: r.category, races: [] };
-      grouped[key].races.push(r);
+      if (!grouped[r.category]) grouped[r.category] = [];
+      grouped[r.category].push(r);
     }
-
-    const partyOrder = ['Democrat', 'Republican'];
-    const sortedKeys = Object.keys(grouped).sort((a, b) => {
-      const [pa, ca] = a.split('__');
-      const [pb, cb] = b.split('__');
-      return partyOrder.indexOf(pa) - partyOrder.indexOf(pb) || ca.localeCompare(cb);
+    const cats = Object.keys(grouped).sort((a, b) => {
+      const ia = CAT_ORDER.indexOf(a), ib = CAT_ORDER.indexOf(b);
+      return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
     });
 
-    for (const key of sortedKeys) {
-      const { party, category, races: raceList } = grouped[key];
-      const label = document.createElement('div');
-      label.className = 'sidebar-section-label';
-      label.textContent = `${party} — ${category}`;
-      list.appendChild(label);
-
-      for (const r of raceList) {
-        const btn = document.createElement('button');
-        btn.className = 'sidebar-race-btn';
-        btn.dataset.race = r.raceName;
-        const dot = document.createElement('span');
-        dot.className = `party-dot ${r.party === 'Democrat' ? 'dem' : 'rep'}`;
-        btn.appendChild(dot);
-        btn.appendChild(document.createTextNode(_formatRaceName(r.raceName)));
-        if (r.raceName === _currentRace) btn.classList.add('active');
-        btn.addEventListener('click', () => _selectRace(r.raceName));
-        list.appendChild(btn);
+    for (const cat of cats) {
+      const grp = document.createElement('optgroup');
+      grp.label = cat;
+      const sorted = [...grouped[cat]].sort((a, b) => {
+        const na = _districtNum(a.raceName), nb = _districtNum(b.raceName);
+        if (na !== null && nb !== null) return na - nb;
+        return _formatRaceOption(a.raceName).localeCompare(_formatRaceOption(b.raceName));
+      });
+      for (const r of sorted) {
+        const opt = document.createElement('option');
+        opt.value = r.raceName;
+        opt.textContent = _formatRaceOption(r.raceName);
+        if (r.raceName === _currentRace) opt.selected = true;
+        grp.appendChild(opt);
       }
+      sel.appendChild(grp);
+    }
 
-      const div = document.createElement('div');
-      div.className = 'divider';
-      list.appendChild(div);
+    sel.onchange = () => { if (sel.value) _selectRace(sel.value); };
+
+    if (!_currentRace && sel.options.length) {
+      _selectRace(sel.options[0].value);
     }
   }
 
-  function _formatRaceName(name) {
-    return name
-      .replace(/_Primary$/, '')
-      .replace(/^(Cook_County|State_House|State_Senate|Congressional|Statewide)_/, '')
-      .replace(/_/g, ' ');
-  }
+  function _bindPartyButtons() {
+    document.querySelectorAll('[data-party]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (btn.dataset.party === _currentParty) return;
+        _currentParty = btn.dataset.party;
+        document.querySelectorAll('[data-party]').forEach(b =>
+          b.classList.toggle('active', b.dataset.party === _currentParty));
 
-  function _bindSearchBox() {
-    const input = document.getElementById('race-search');
-    if (!input) return;
-    input.addEventListener('input', () => _buildRaceList(input.value));
+        const demRace = _currentRace
+          ? _currentRace.replace(/_(DEM|GOP)_Primary$/, '_DEM_Primary')
+          : null;
+        const demRaces = ElectionData.getRaces()
+          .filter(r => r.party === 'Democrat')
+          .map(r => r.raceName);
+
+        if (_currentParty === 'COMPOSITE') {
+          _currentRace = (demRace && demRaces.includes(demRace)) ? demRace : (demRaces[0] || null);
+        } else {
+          const suffix = `_${_currentParty}_Primary`;
+          const equiv  = demRace ? demRace.replace('_DEM_Primary', suffix) : null;
+          const partyRaces = ElectionData.getRaces()
+            .filter(r => r.party === (_currentParty === 'DEM' ? 'Democrat' : 'Republican'))
+            .map(r => r.raceName);
+          _currentRace = (equiv && partyRaces.includes(equiv)) ? equiv : (partyRaces[0] || null);
+        }
+
+        _buildRaceSelect();
+        if (_currentRace) _selectRace(_currentRace);
+      });
+    });
   }
 
   // ── Race selection ────────────────────────────────────────────────────────
@@ -96,18 +148,14 @@ const ElectionUI = (() => {
     _groupC             = [];
     _orderingCandidates = [];
     _currentJurisdictions = null;
+    _currentJurLabel    = null;
 
     _currentCandidates = ElectionData.getCandidates(raceName);
     ElectionMap.assignCandidateColors(_currentCandidates, raceName);
     _allJurisdictions = ElectionData.getJurisdictions(raceName);
 
-    document.querySelectorAll('.sidebar-race-btn').forEach(b => {
-      b.classList.toggle('active', b.dataset.race === raceName);
-    });
-
-    document.getElementById('map-title').textContent = _formatRaceName(raceName);
-    document.getElementById('map-subtitle').textContent =
-      `${_currentCandidates.length} candidate${_currentCandidates.length !== 1 ? 's' : ''} · ${_allJurisdictions.length} jurisdiction${_allJurisdictions.length !== 1 ? 's' : ''}`;
+    const sel = document.getElementById('race-select');
+    if (sel) sel.value = raceName;
 
     document.getElementById('map-controls').style.display = 'flex';
     document.getElementById('stats-section').style.display = 'block';
@@ -126,8 +174,13 @@ const ElectionUI = (() => {
     _buildGeoFilter();
     _updateModeButtons();
     _buildOrderingPanel();
-    ElectionMap.render(raceName, 'winner');
-    _buildLegend();
+    if (_currentParty === 'COMPOSITE') {
+      ElectionMap.render(raceName, 'winner', { composite: true });
+      _buildCompositeLegend();
+    } else {
+      ElectionMap.render(raceName, 'winner');
+      _buildLegend();
+    }
     _buildStatsTable();
     _updateGroupingPanel();
   }
@@ -151,10 +204,18 @@ const ElectionUI = (() => {
     const heatControl   = document.getElementById('heat-candidate-control');
     const groupPanel    = document.getElementById('grouping-panel');
     const orderingPanel = document.getElementById('ordering-panel');
+    const isComposite   = _currentParty === 'COMPOSITE';
 
-    heatControl.style.display   = _currentMode === 'heat'     ? 'flex'  : 'none';
-    groupPanel.style.display    = _currentMode === 'group'    ? 'block' : 'none';
-    if (orderingPanel) orderingPanel.style.display = _currentMode === 'ordering' ? 'block' : 'none';
+    heatControl.style.display   = (!isComposite && _currentMode === 'heat')     ? 'flex'  : 'none';
+    groupPanel.style.display    = (!isComposite && _currentMode === 'group')    ? 'block' : 'none';
+    if (orderingPanel) orderingPanel.style.display = (!isComposite && _currentMode === 'ordering') ? 'block' : 'none';
+
+    if (isComposite) {
+      ElectionMap.render(_currentRace, 'winner', { jurisdictions: _currentJurisdictions, composite: true });
+      _buildCompositeLegend();
+      _buildStatsTable();
+      return;
+    }
 
     if (_currentMode === 'winner') {
       ElectionMap.render(_currentRace, 'winner', { jurisdictions: _currentJurisdictions });
@@ -185,13 +246,14 @@ const ElectionUI = (() => {
   }
 
   function _updateModeButtons() {
+    const isComposite = _currentParty === 'COMPOSITE';
     const n           = _currentCandidates.length;
     const heatBtn     = document.querySelector('[data-mode="heat"]');
     const groupBtn    = document.querySelector('[data-mode="group"]');
     const orderingBtn = document.getElementById('btn-ordering');
-    if (heatBtn)     heatBtn.style.display     = n >= 3 ? '' : 'none';
-    if (groupBtn)    groupBtn.style.display    = n >= 3 ? '' : 'none';
-    if (orderingBtn) orderingBtn.style.display = n >= 3 ? '' : 'none';
+    if (heatBtn)     heatBtn.style.display     = (!isComposite && n >= 3) ? '' : 'none';
+    if (groupBtn)    groupBtn.style.display    = (!isComposite && n >= 3) ? '' : 'none';
+    if (orderingBtn) orderingBtn.style.display = (!isComposite && n >= 3) ? '' : 'none';
   }
 
   // ── Heat candidate picker ─────────────────────────────────────────────────
@@ -211,6 +273,41 @@ const ElectionUI = (() => {
 
   // ── Geographic filter ─────────────────────────────────────────────────────
 
+  function _titleCase(str) {
+    return str.toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+  }
+
+  function _buildMergedOptions(rawJurs) {
+    const hasCook    = rawJurs.includes('COOK');
+    const hasChicago = rawJurs.includes('CITY OF CHICAGO');
+    const citySet    = new Set(Object.keys(CITY_MERGE));
+    const skipSet    = new Set([...citySet, 'COOK', 'CITY OF CHICAGO']);
+    const options    = [];
+
+    for (const jur of rawJurs) {
+      if (skipSet.has(jur)) continue;
+      const cityJurs = Object.entries(CITY_MERGE)
+        .filter(([city, county]) => county === jur && rawJurs.includes(city))
+        .map(([city]) => city);
+      options.push({ label: _titleCase(jur), jurs: [jur, ...cityJurs] });
+    }
+
+    if (hasCook || hasChicago) {
+      if (hasCook && hasChicago) {
+        options.push({ label: 'Cook County',     jurs: ['COOK', 'CITY OF CHICAGO'] });
+        options.push({ label: 'Suburban Cook',   jurs: ['COOK'] });
+        options.push({ label: 'City of Chicago', jurs: ['CITY OF CHICAGO'] });
+      } else if (hasCook) {
+        options.push({ label: 'Cook County',     jurs: ['COOK'] });
+      } else {
+        options.push({ label: 'City of Chicago', jurs: ['CITY OF CHICAGO'] });
+      }
+    }
+
+    options.sort((a, b) => a.label.localeCompare(b.label));
+    return options;
+  }
+
   function _buildGeoFilter() {
     const ctrl  = document.getElementById('geo-filter-control');
     const chips = document.getElementById('geo-filter-chips');
@@ -221,31 +318,100 @@ const ElectionUI = (() => {
     ctrl.style.display = 'flex';
     chips.innerHTML = '';
 
-    const allChip = _makeGeoChip('All', true, () => {
-      _currentJurisdictions = null;
-      chips.querySelectorAll('.geo-chip').forEach(c => c.classList.toggle('active', c.dataset.jur === 'ALL'));
-      _applyMode();
-    });
-    allChip.dataset.jur = 'ALL';
-    chips.appendChild(allChip);
+    const mergedOptions = _buildMergedOptions(_allJurisdictions);
 
-    for (const jur of _allJurisdictions) {
-      const chip = _makeGeoChip(jur, false, () => {
-        _currentJurisdictions = [jur];
-        chips.querySelectorAll('.geo-chip').forEach(c => c.classList.toggle('active', c.dataset.jur === jur));
-        _applyMode();
-      });
-      chip.dataset.jur = jur;
-      chips.appendChild(chip);
+    const wrap = document.createElement('div');
+    wrap.className = 'geo-select-wrap';
+
+    const btn = document.createElement('button');
+    btn.className = 'geo-select-btn';
+    btn.type = 'button';
+    btn.textContent = _currentJurLabel || 'All';
+
+    const panel = document.createElement('div');
+    panel.className = 'geo-select-panel';
+    panel.style.display = 'none';
+
+    const searchWrap = document.createElement('div');
+    searchWrap.className = 'geo-select-search';
+    const searchInput = document.createElement('input');
+    searchInput.type = 'text';
+    searchInput.placeholder = 'Search areas…';
+    searchInput.autocomplete = 'off';
+    searchWrap.appendChild(searchInput);
+
+    const optList = document.createElement('div');
+    optList.className = 'geo-select-options';
+    panel.appendChild(searchWrap);
+    panel.appendChild(optList);
+    wrap.appendChild(btn);
+    wrap.appendChild(panel);
+    chips.appendChild(wrap);
+
+    function _isActive(opt) {
+      if (!_currentJurisdictions) return false;
+      return opt.jurs.length === _currentJurisdictions.length &&
+        opt.jurs.every(j => _currentJurisdictions.includes(j));
     }
-  }
 
-  function _makeGeoChip(label, active, onClick) {
-    const chip = document.createElement('button');
-    chip.className = `geo-chip${active ? ' active' : ''}`;
-    chip.textContent = label;
-    chip.addEventListener('click', onClick);
-    return chip;
+    function renderOptions(filter) {
+      optList.innerHTML = '';
+      const q = (filter || '').toLowerCase();
+
+      if (!q) {
+        const allOpt = document.createElement('button');
+        allOpt.className = 'geo-select-opt' + (!_currentJurisdictions ? ' active' : '');
+        allOpt.textContent = 'All';
+        allOpt.type = 'button';
+        allOpt.addEventListener('click', () => {
+          _currentJurisdictions = null;
+          _currentJurLabel = null;
+          btn.textContent = 'All';
+          panel.style.display = 'none';
+          _geoPanel = null;
+          renderOptions('');
+          _applyMode();
+        });
+        optList.appendChild(allOpt);
+      }
+
+      const filtered = q ? mergedOptions.filter(o => o.label.toLowerCase().includes(q)) : mergedOptions;
+      for (const opt of filtered) {
+        const el = document.createElement('button');
+        el.className = 'geo-select-opt' + (_isActive(opt) ? ' active' : '');
+        el.textContent = opt.label;
+        el.type = 'button';
+        el.addEventListener('click', () => {
+          _currentJurisdictions = opt.jurs;
+          _currentJurLabel = opt.label;
+          btn.textContent = opt.label;
+          panel.style.display = 'none';
+          _geoPanel = null;
+          renderOptions('');
+          _applyMode();
+        });
+        optList.appendChild(el);
+      }
+    }
+
+    renderOptions('');
+
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      if (_geoPanel && _geoPanel !== panel) {
+        _geoPanel.style.display = 'none';
+      }
+      const opening = panel.style.display === 'none';
+      panel.style.display = opening ? 'flex' : 'none';
+      _geoPanel = opening ? panel : null;
+      if (opening) {
+        searchInput.value = '';
+        renderOptions('');
+        searchInput.focus();
+      }
+    });
+
+    searchInput.addEventListener('input', () => renderOptions(searchInput.value));
   }
 
   // ── Grouping panel ────────────────────────────────────────────────────────
@@ -423,6 +589,16 @@ function _buildOrderingLegend() {
     }
   }
 
+  function _buildCompositeLegend() {
+    const legend = document.getElementById('map-legend');
+    if (!legend) return;
+    legend.innerHTML = `
+      <div class="legend-item"><span class="legend-swatch" style="background:#4f93d1"></span> Dem majority</div>
+      <div class="legend-item"><span class="legend-swatch" style="background:#1c2330"></span> Even</div>
+      <div class="legend-item"><span class="legend-swatch" style="background:#d16f4f"></span> Rep majority</div>
+    `;
+  }
+
   function _buildHeatLegend(candidate) {
     const legend = document.getElementById('map-legend');
     if (!legend) return;
@@ -453,12 +629,95 @@ function _buildOrderingLegend() {
     const grid = document.getElementById('stats-grid');
     if (!grid || !_currentRace) return;
     grid.innerHTML = '';
+    if (_currentParty === 'COMPOSITE') {
+      _buildCompositeStatsTable(grid);
+      return;
+    }
     if (_currentMode === 'group' && (_groupA.length || _groupB.length || _groupC.length)) {
       _buildGroupStatsTable(grid);
     } else {
       _buildCandidateStatsTable(grid);
     }
     _buildBreakdownSections(grid);
+  }
+
+  function _buildCompositeStatsTable(grid) {
+    const repRaceName = _currentRace.replace('_DEM_Primary', '_GOP_Primary');
+    const { totalVoters: demTotal } = ElectionData.getDistrictTotals(_currentRace, _currentJurisdictions);
+    const { totalVoters: repTotal } = ElectionData.getDistrictTotals(repRaceName, _currentJurisdictions);
+    const grandTotal = demTotal + repTotal;
+
+    let demPrecincts = 0, repPrecincts = 0, evenPrecincts = 0;
+    for (const [jf, precinct] of Object.entries(ElectionData.raw)) {
+      if (_currentJurisdictions && !_currentJurisdictions.includes(jf.split(':')[0])) continue;
+      const demData = precinct.races?.[_currentRace];
+      const repData = precinct.races?.[repRaceName];
+      if (!demData && !repData) continue;
+      const dem = demData ? (parseFloat(demData['Total Voters']) || 0) : 0;
+      const rep = repData ? (parseFloat(repData['Total Voters']) || 0) : 0;
+      if (dem + rep === 0) continue;
+      if (dem > rep) demPrecincts++;
+      else if (rep > dem) repPrecincts++;
+      else evenPrecincts++;
+    }
+    const totalPrecincts = demPrecincts + repPrecincts + evenPrecincts;
+
+    const card = document.createElement('div');
+    card.className = 'card';
+    const titleEl = document.createElement('div');
+    titleEl.className = 'card-title';
+    const isStatewide = ElectionData.getRaces().find(r => r.raceName === _currentRace)?.category === 'Statewide';
+    titleEl.textContent = _currentJurisdictions
+      ? `Party Composition — ${_currentJurLabel || _currentJurisdictions.join(', ')}`
+      : isStatewide ? 'Statewide Party Composition' : 'District-Wide Party Composition';
+    card.appendChild(titleEl);
+
+    const table = document.createElement('table');
+    table.className = 'stats-table';
+    table.innerHTML = `<thead><tr>
+      <th>Party</th>
+      <th style="text-align:right">Precincts</th>
+      <th style="text-align:right">Votes</th>
+      <th style="text-align:right">Share</th>
+    </tr></thead>`;
+
+    const tbody = document.createElement('tbody');
+    for (const { label, votes, precincts, color } of [
+      { label: 'Democrat',   votes: demTotal, precincts: demPrecincts, color: '#4f93d1' },
+      { label: 'Republican', votes: repTotal, precincts: repPrecincts, color: '#d16f4f' },
+    ]) {
+      const share = grandTotal > 0 ? ((votes / grandTotal) * 100).toFixed(1) : '—';
+      const pPct  = totalPrecincts > 0 ? ((precincts / totalPrecincts) * 100).toFixed(1) : '—';
+      const tr    = document.createElement('tr');
+      tr.innerHTML = `
+        <td style="white-space:nowrap"><span class="candidate-color-bar" style="background:${color}"></span>${label}</td>
+        <td class="num">${precincts} (${pPct}%)</td>
+        <td class="num">${votes.toLocaleString()}</td>
+        <td class="num">${share}%</td>
+      `;
+      tbody.appendChild(tr);
+    }
+    if (evenPrecincts > 0) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td style="white-space:nowrap"><span class="candidate-color-bar" style="background:#484f58"></span>Even</td>
+        <td class="num">${evenPrecincts}</td>
+        <td class="num">—</td>
+        <td class="num">—</td>
+      `;
+      tbody.appendChild(tr);
+    }
+    const totalTr = document.createElement('tr');
+    totalTr.innerHTML = `
+      <td style="font-weight:600">Total</td>
+      <td class="num" style="font-weight:600">${totalPrecincts.toLocaleString()}</td>
+      <td class="num" style="font-weight:600">${grandTotal.toLocaleString()}</td>
+      <td class="num">100%</td>
+    `;
+    tbody.appendChild(totalTr);
+    table.appendChild(tbody);
+    card.appendChild(table);
+    grid.appendChild(card);
   }
 
   function _buildCandidateStatsTable(grid) {
@@ -480,8 +739,8 @@ function _buildOrderingLegend() {
     titleEl.className = 'card-title';
     const isStatewide = ElectionData.getRaces().find(r => r.raceName === _currentRace)?.category === 'Statewide';
     titleEl.textContent = _currentJurisdictions
-      ? `Results — ${_currentJurisdictions.join(', ')}`
-      : isStatewide ? 'Chicagoland Vote Totals' : 'District-Wide Vote Totals';
+      ? `Results — ${_currentJurLabel || _currentJurisdictions.join(', ')}`
+      : isStatewide ? 'Statewide Vote Totals' : 'District-Wide Vote Totals';
     card.appendChild(titleEl);
 
     const table = document.createElement('table');

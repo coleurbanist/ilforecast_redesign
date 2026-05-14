@@ -19,7 +19,6 @@ const ElectionData = (() => {
   let _precincts    = null;
   let _geojson      = null;
   let _normalizeMap = null;
-  const _categoryGeoJSON = {};
 
   // ── Normalization ─────────────────────────────────────────────────────────
 
@@ -360,94 +359,8 @@ const ElectionData = (() => {
 
   const GEOJSON_BASE = 'data/election_shapefiles/';
 
-  const CATEGORY_GEOJSON = {
-    'Congressional':  { file: 'IL24_congressional.geojson', field: 'cd_district' },
-    'State House':    { file: 'IL24_house.geojson',         field: 'house_district' },
-    'State Senate':   { file: 'IL24_senate.geojson',        field: 'senate_district' },
-    'Cook County':    { file: 'IL24_cook_county.geojson',   field: null },
-    'Statewide':      { file: 'IL24_slim.geojson',          field: null },
-  };
-
-  // Extract district number from race name e.g. "State_House_District_13_DEM_Primary" -> "13"
-  function _extractDistrict(raceName) {
-    const m = raceName.match(/District_(\w+)(?:_|$)/i);
-    return m ? m[1] : null;
-  }
-
-  // Extract congressional district label e.g. "Illinois_9th_Congressional" -> "9th"
-  function _extractCongressional(raceName) {
-    const m = raceName.match(/Illinois_(\w+)_Congressional/i);
-    return m ? m[1].toLowerCase() : null;
-  }
-
-  // Extract BOR/CCC district number
-  function _extractCookDistrict(raceName) {
-    const m = raceName.match(/District_(\d+)/i);
-    return m ? m[1] : null;
-  }
-
-  async function loadGeoJSONForRace(raceName, geojsonBasePath) {
-    const { category } = _parseRaceMeta(raceName);
-    const config = CATEGORY_GEOJSON[category] || CATEGORY_GEOJSON['Statewide'];
-
-    if (!_categoryGeoJSON[config.file]) {
-      const res = await fetch(geojsonBasePath + config.file);
-      _categoryGeoJSON[config.file] = await res.json();
-    }
-
-    const raw = _categoryGeoJSON[config.file];
-
-    if (category === 'Congressional') {
-      const districtValue = _extractCongressional(raceName);
-      if (!districtValue) return raw;
-      const features = raw.features.filter(f =>
-        String(f.properties?.cd_district).toLowerCase() === districtValue
-      );
-      return { ...raw, features };
-
-    } else if (category === 'Cook County') {
-      const upper = raceName.toUpperCase();
-      const isBOR = upper.includes('BOARD_OF_REVIEW');
-      const isCCC = upper.includes('COMMISSIONER');
-
-      // Board President and Assessor cover all of Cook — use slim GeoJSON
-      if (!isBOR && !isCCC) {
-        if (!_categoryGeoJSON['IL24_slim.geojson']) {
-          const res = await fetch(geojsonBasePath + 'IL24_slim.geojson');
-          _categoryGeoJSON['IL24_slim.geojson'] = await res.json();
-        }
-        return _categoryGeoJSON['IL24_slim.geojson'];
-      }
-
-      const num = _extractCookDistrict(raceName);
-      if (!num) return raw;
-
-      const field = isBOR ? 'bor_district' : 'ccc_district';
-      const features = raw.features.filter(f =>
-        String(f.properties?.[field]) === String(num)
-      );
-      return { ...raw, features };
-
-    } else if (category === 'State House') {
-      const m = raceName.match(/State_House_District_(\d+)/i);
-      const districtValue = m ? m[1] : null;
-      if (!districtValue) return raw;
-      const features = raw.features.filter(f =>
-        String(f.properties?.house_district) === String(districtValue)
-      );
-      return { ...raw, features };
-
-    } else if (category === 'State Senate') {
-      const m = raceName.match(/State_Senate_District_(\d+)/i);
-      const districtValue = m ? m[1] : null;
-      if (!districtValue) return raw;
-      const features = raw.features.filter(f =>
-        String(f.properties?.senate_district) === String(districtValue)
-      );
-      return { ...raw, features };
-    }
-
-    return raw;
+  async function loadGeoJSONForRace() {
+    return _geojson;
   }
   function computeOrderingTotals(raceName, candidates, jurisdictionFilter = null) {
     // candidates is an array of up to 3 candidate names

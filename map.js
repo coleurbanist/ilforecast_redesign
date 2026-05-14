@@ -13,27 +13,80 @@ const ElectionMap = (() => {
     return s.trim().toUpperCase().replace(/\s+/g, ' ');
   }
 
-  function _filterGeoJSON(geojson, raceName, jurisdictionFilter) {
+  function _filterGeoJSON(geojson, raceName, jurisdictionFilter, altRaceName) {
     if (!geojson) return null;
     const features = geojson.features.filter(f => {
       const jf = f.properties?.JoinField;
       if (!jf) return false;
       if (jurisdictionFilter && !jurisdictionFilter.includes(jf.split(':')[0])) return false;
-      return ElectionData.getRaceData(jf, raceName) !== null;
+      return ElectionData.getRaceData(jf, raceName) !== null ||
+             (altRaceName && ElectionData.getRaceData(jf, altRaceName) !== null);
     });
     return { ...geojson, features };
   }
 
-  let _geojsonLayer            = null;
-  let _currentRace             = null;
-  let _currentMode             = 'winner';
-  let _currentHeatCandidate    = null;
-  let _currentGroupA           = [];
-  let _currentGroupB           = [];
-  let _currentGroupC           = [];
+  let _geojsonLayer              = null;
+  let _currentRace               = null;
+  let _currentMode               = 'winner';
+  let _currentComposite          = false;
+  let _currentHeatCandidate      = null;
+  let _currentGroupA             = [];
+  let _currentGroupB             = [];
+  let _currentGroupC             = [];
   let _currentOrderingCandidates = [];
-  let _currentJurisdictions    = null;
-  let _onPrecinctClick         = null;
+  let _currentJurisdictions      = null;
+  let _onPrecinctClick           = null;
+
+  const _districtBoundaryCache = {};
+
+  const DISTRICT_BOUNDARY = {
+    state_house:   { file: 'state_house_districts.geojson',  re: /State_House_District_(\d+)/i },
+    state_senate:  { file: 'state_senate_districts.geojson', re: /State_Senate_District_(\d+)/i },
+    congressional: { file: 'congressional_districts.geojson', re: /Illinois_(\w+)_Congressional/i },
+    bor:           { file: 'bor_districts.geojson',          re: /Board_of_Review_District_(\d+)/i },
+    ccc:           { file: 'ccc_districts.geojson',          re: /Commissioner_District_(\d+)/i },
+  };
+
+  function _getDistrictBoundaryKey(raceName) {
+    const upper = raceName.toUpperCase();
+    if (upper.startsWith('STATE_HOUSE_'))        return 'state_house';
+    if (upper.startsWith('STATE_SENATE_'))       return 'state_senate';
+    if (upper.includes('CONGRESSIONAL'))         return 'congressional';
+    if (upper.includes('BOARD_OF_REVIEW'))       return 'bor';
+    if (upper.startsWith('COOK_COUNTY_COMMISSIONER')) return 'ccc';
+    return null;
+  }
+
+  async function _clipToDistrict(raceName, geojson, basePath) {
+    const key = _getDistrictBoundaryKey(raceName);
+    if (!key) return geojson;
+    const cfg = DISTRICT_BOUNDARY[key];
+
+    const m = raceName.match(cfg.re);
+    const num = m ? parseInt(m[1], 10) : null;
+    if (!num) return geojson;
+
+    if (!_districtBoundaryCache[cfg.file]) {
+      const res = await fetch(basePath + cfg.file);
+      _districtBoundaryCache[cfg.file] = await res.json();
+    }
+    const districtFeature = _districtBoundaryCache[cfg.file].features
+      .find(f => f.properties.district === num);
+    if (!districtFeature) return geojson;
+
+    const clipped = [];
+    for (const feature of geojson.features) {
+      try {
+        const result = turf.intersect(feature, districtFeature);
+        if (result) {
+          clipped.push({ ...feature, geometry: result.geometry });
+        }
+      } catch (e) {
+        clipped.push(feature);
+      }
+    }
+    return { ...geojson, features: clipped };
+  }
 
   const CANDIDATE_COLORS = [
     '#4f93d1', '#d16f4f', '#5cb85c', '#9b59b6',
@@ -118,22 +171,26 @@ const ElectionMap = (() => {
   // ── Layer rendering ───────────────────────────────────────────────────────
 
   async function render(raceName, mode, options = {}) {
-    _currentRace = raceName;
-    _currentMode = mode;
+    _currentRace      = raceName;
+    _currentMode      = mode;
+    _currentComposite = options.composite || false;
     _currentJurisdictions = options.jurisdictions || null;
 
     if (_geojsonLayer) { _map.removeLayer(_geojsonLayer); _geojsonLayer = null; }
 
-    const baseGeoJSON = await ElectionData.loadGeoJSONForRace(raceName, 'data/election_shapefiles/');
-    const geojson = _filterGeoJSON(baseGeoJSON, raceName, _currentJurisdictions);
-    if (!geojson || geojson.features.length === 0) {
+    const baseGeoJSON  = await ElectionData.loadGeoJSONForRace();
+    const repRaceName  = _currentComposite ? raceName.replace('_DEM_Primary', '_GOP_Primary') : null;
+    const filtered     = _filterGeoJSON(baseGeoJSON, raceName, _currentJurisdictions, repRaceName);
+    if (!filtered || filtered.features.length === 0) {
       console.warn('No GeoJSON features for race:', raceName);
       return;
     }
+    const geojson = await _clipToDistrict(raceName, filtered, 'data/election_shapefiles/');
 
-    if      (mode === 'winner')   _renderWinner(raceName, geojson);
-    else if (mode === 'heat')     _renderHeat(raceName, options.candidate, geojson);
-    else if (mode === 'group')    _renderGroup(raceName, options.groupA || [], options.groupB || [], geojson, options);
+    if (_currentComposite)      _renderComposite(raceName, repRaceName, geojson);
+    else if (mode === 'winner') _renderWinner(raceName, geojson);
+    else if (mode === 'heat')   _renderHeat(raceName, options.candidate, geojson);
+    else if (mode === 'group')  _renderGroup(raceName, options.groupA || [], options.groupB || [], geojson, options);
     else if (mode === 'ordering') _renderOrdering(raceName, options.candidates || [], geojson);
 
     if (_geojsonLayer) _map.fitBounds(_geojsonLayer.getBounds(), { padding: [20, 20] });
@@ -152,6 +209,27 @@ const ElectionMap = (() => {
         const color   = winner ? getCandidateColor(winner) : '#333';
         const opacity = winner ? 0.3 + (share * 0.7) : 0.15;
         return { fillColor: color, fillOpacity: opacity, color, weight: 0.5, smoothFactor: 0 };
+      },
+      onEachFeature: _bindTooltip,
+    }).addTo(_map);
+  }
+
+  function _renderComposite(demRaceName, repRaceName, geojson) {
+    _geojsonLayer = L.geoJSON(geojson, {
+      style: feature => {
+        const jf = feature.properties.JoinField;
+        const demData = ElectionData.getRaceData(jf, demRaceName);
+        const repData = ElectionData.getRaceData(jf, repRaceName);
+        const dem = demData ? (parseFloat(demData['Total Voters']) || 0) : 0;
+        const rep = repData ? (parseFloat(repData['Total Voters']) || 0) : 0;
+        const total = dem + rep;
+        if (!total) return _noDataStyle();
+        const demShare = dem / total;
+        const t = Math.min(Math.abs(demShare - 0.5) * 2, 1) * 0.8 + 0.15;
+        const color = demShare >= 0.5
+          ? lerpColor('#1c2330', '#4f93d1', t)
+          : lerpColor('#1c2330', '#d16f4f', t);
+        return { fillColor: color, fillOpacity: 0.85, color, weight: 0.5, smoothFactor: 0 };
       },
       onEachFeature: _bindTooltip,
     }).addTo(_map);
@@ -230,48 +308,67 @@ const ElectionMap = (() => {
       },
       mousemove: e => {
         const jf = feature.properties.JoinField;
-        const raceData = ElectionData.getRaceData(jf, _currentRace);
-        if (!raceData) return;
+        let rows, total;
 
-        const candidates = ElectionData.getCandidates(_currentRace);
-        const total = raceData['Total Voters'] || 0;
-        let rows;
-
-        if (_currentMode === 'group') {
-          const groups = [
-            { label: _currentGroupA.join(' + ') || 'Group A', members: _currentGroupA, color: '#4f93d1' },
-            { label: _currentGroupB.join(' + ') || 'Group B', members: _currentGroupB, color: '#d16f4f' },
-            { label: _currentGroupC.join(' + ') || 'Group C', members: _currentGroupC, color: '#2ecc71' },
-          ].filter(g => g.members.length > 0);
-          const combined = groups.reduce((sum, g) =>
-            sum + g.members.reduce((s, c) => s + (parseFloat(raceData[c]) || 0), 0), 0);
-          rows = groups.map(g => {
-            const v   = g.members.reduce((s, c) => s + (parseFloat(raceData[c]) || 0), 0);
-            const pct = combined > 0 ? ((v / combined) * 100).toFixed(1) : '—';
-            const dot = `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${g.color};margin-right:5px;"></span>`;
-            return `<tr><td>${dot}${g.label}</td><td style="text-align:right;padding-left:16px;font-family:monospace">${v.toLocaleString()} (${pct}%)</td></tr>`;
+        if (_currentComposite) {
+          const repRaceName = _currentRace.replace('_DEM_Primary', '_GOP_Primary');
+          const demData = ElectionData.getRaceData(jf, _currentRace);
+          const repData = ElectionData.getRaceData(jf, repRaceName);
+          const dem = demData ? (parseFloat(demData['Total Voters']) || 0) : 0;
+          const rep = repData ? (parseFloat(repData['Total Voters']) || 0) : 0;
+          total = dem + rep;
+          if (!total) return;
+          rows = [
+            { label: 'Democrat', votes: dem, color: '#4f93d1' },
+            { label: 'Republican', votes: rep, color: '#d16f4f' },
+          ].map(({ label, votes, color }) => {
+            const pct = ((votes / total) * 100).toFixed(1);
+            const dot = `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${color};margin-right:5px;"></span>`;
+            return `<tr><td>${dot}${label}</td><td style="text-align:right;padding-left:16px;font-family:monospace">${votes.toLocaleString()} (${pct}%)</td></tr>`;
           }).join('');
-
-        } else if (_currentMode === 'ordering' && _currentOrderingCandidates.length) {
-          const combined = _currentOrderingCandidates.reduce((s, c) => s + (parseFloat(raceData[c]) || 0), 0);
-          rows = [..._currentOrderingCandidates]
-            .map(c => ({ c, v: parseFloat(raceData[c]) || 0 }))
-            .sort((a, b) => b.v - a.v)
-            .map(({ c, v }) => {
-              const pct = combined > 0 ? ((v / combined) * 100).toFixed(1) : '—';
-              const dot = `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${getCandidateColor(c)};margin-right:5px;"></span>`;
-              return `<tr><td>${dot}${c}</td><td style="text-align:right;padding-left:16px;font-family:monospace">${v.toLocaleString()} (${pct}%)</td></tr>`;
-            }).join('');
-
         } else {
-          rows = [...candidates]
-            .sort((a, b) => (parseFloat(raceData[b]) || 0) - (parseFloat(raceData[a]) || 0))
-            .map(c => {
-              const v   = parseFloat(raceData[c]) || 0;
-              const pct = total > 0 ? ((v / total) * 100).toFixed(1) : '—';
-              const dot = `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${getCandidateColor(c)};margin-right:5px;"></span>`;
-              return `<tr><td>${dot}${c}</td><td style="text-align:right;padding-left:16px;font-family:monospace">${v.toLocaleString()} (${pct}%)</td></tr>`;
+          const raceData = ElectionData.getRaceData(jf, _currentRace);
+          if (!raceData) return;
+
+          const candidates = ElectionData.getCandidates(_currentRace);
+          total = raceData['Total Voters'] || 0;
+
+          if (_currentMode === 'group') {
+            const groups = [
+              { label: _currentGroupA.join(' + ') || 'Group A', members: _currentGroupA, color: '#4f93d1' },
+              { label: _currentGroupB.join(' + ') || 'Group B', members: _currentGroupB, color: '#d16f4f' },
+              { label: _currentGroupC.join(' + ') || 'Group C', members: _currentGroupC, color: '#2ecc71' },
+            ].filter(g => g.members.length > 0);
+            const combined = groups.reduce((sum, g) =>
+              sum + g.members.reduce((s, c) => s + (parseFloat(raceData[c]) || 0), 0), 0);
+            rows = groups.map(g => {
+              const v   = g.members.reduce((s, c) => s + (parseFloat(raceData[c]) || 0), 0);
+              const pct = combined > 0 ? ((v / combined) * 100).toFixed(1) : '—';
+              const dot = `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${g.color};margin-right:5px;"></span>`;
+              return `<tr><td>${dot}${g.label}</td><td style="text-align:right;padding-left:16px;font-family:monospace">${v.toLocaleString()} (${pct}%)</td></tr>`;
             }).join('');
+
+          } else if (_currentMode === 'ordering' && _currentOrderingCandidates.length) {
+            const combined = _currentOrderingCandidates.reduce((s, c) => s + (parseFloat(raceData[c]) || 0), 0);
+            rows = [..._currentOrderingCandidates]
+              .map(c => ({ c, v: parseFloat(raceData[c]) || 0 }))
+              .sort((a, b) => b.v - a.v)
+              .map(({ c, v }) => {
+                const pct = combined > 0 ? ((v / combined) * 100).toFixed(1) : '—';
+                const dot = `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${getCandidateColor(c)};margin-right:5px;"></span>`;
+                return `<tr><td>${dot}${c}</td><td style="text-align:right;padding-left:16px;font-family:monospace">${v.toLocaleString()} (${pct}%)</td></tr>`;
+              }).join('');
+
+          } else {
+            rows = [...candidates]
+              .sort((a, b) => (parseFloat(raceData[b]) || 0) - (parseFloat(raceData[a]) || 0))
+              .map(c => {
+                const v   = parseFloat(raceData[c]) || 0;
+                const pct = total > 0 ? ((v / total) * 100).toFixed(1) : '—';
+                const dot = `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${getCandidateColor(c)};margin-right:5px;"></span>`;
+                return `<tr><td>${dot}${c}</td><td style="text-align:right;padding-left:16px;font-family:monospace">${v.toLocaleString()} (${pct}%)</td></tr>`;
+              }).join('');
+          }
         }
 
         const precinct = _precinctLabel(jf);
@@ -295,7 +392,8 @@ const ElectionMap = (() => {
   function _getWinner(raceData, candidates) {
     let winner = null, max = -1;
     for (const c of candidates) {
-      if ((parseFloat(raceData[c]) || 0) > max) { max = parseFloat(raceData[c]); winner = c; }
+      const votes = parseFloat(raceData[c]) || 0;
+      if (votes > max) { max = votes; winner = c; }
     }
     return winner;
   }

@@ -228,7 +228,7 @@
     "urban_rural": "Rural"
   },
   "JACKSON": {
-    "metro_area": null,
+    "metro_area": "Carbondale-Marion",
     "upstate_downstate": "Downstate",
     "region": "Southern",
     "urban_rural": "Small Urban"
@@ -324,7 +324,7 @@
     "urban_rural": "Rural"
   },
   "MACON": {
-    "metro_area": null,
+    "metro_area": "Decatur",
     "upstate_downstate": "Downstate",
     "region": "Central",
     "urban_rural": "Small Urban"
@@ -360,7 +360,7 @@
     "urban_rural": "Rural"
   },
   "MASSAC": {
-    "metro_area": null,
+    "metro_area": "Paducah",
     "upstate_downstate": "Downstate",
     "region": "Southern",
     "urban_rural": "Rural"
@@ -594,7 +594,7 @@
     "urban_rural": "Suburban"
   },
   "WILLIAMSON": {
-    "metro_area": null,
+    "metro_area": "Carbondale-Marion",
     "upstate_downstate": "Downstate",
     "region": "Southern",
     "urban_rural": "Rural"

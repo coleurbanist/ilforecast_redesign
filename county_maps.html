@@ -357,12 +357,18 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
 <script src="nav.js"></script>
 <script>
 (function () {
   const GEOJSON_PATH        = 'data/election_shapefiles/IL_counties.geojson';
   const DATA_PATH           = 'data/election_csvs/clean/2026/Primary/2026_primary_counties.json';
   const CLASSIFICATIONS_PATH = 'data/county_classifications.json';
+  const DISTRICT_GEOJSON = {
+    representative: 'data/election_shapefiles/state_house_districts.geojson',
+    senate:         'data/election_shapefiles/state_senate_districts.geojson',
+    congress:       'data/election_shapefiles/congressional_districts.geojson',
+  };
 
   const CANDIDATE_COLORS = [
     '#4f93d1', '#d16f4f', '#5cb85c', '#9b59b6',
@@ -383,9 +389,7 @@
     'ATTORNEY GENERAL', 'COMPTROLLER', 'SECRETARY OF STATE', 'TREASURER',
   ];
 
-  // GeoJSON "JO DAVIESS" → data key "JODAVIESS"
-  const GEO_TO_DATA = { 'JO DAVIESS': 'JODAVIESS' };
-  function dataKey(n) { return GEO_TO_DATA[n] || n; }
+  function dataKey(n) { return n; }
 
   let countyData = null, countiesGeo = null;
   let map = null, geojsonLayer = null;
@@ -408,7 +412,12 @@
   let classViewMode = 'counties';
   let classGroupBy = 'region';
 
-  const DATA_TO_GEO = { 'JODAVIESS': 'JO DAVIESS', 'DEWITT': 'DE WITT', 'LASALLE': 'LA SALLE' };
+  let districtFeature = null;
+  let districtGeoCache = {};
+  let clippedCountyFeatures = null;
+  let loadedDistrictRace = null;
+
+  const DATA_TO_GEO = { 'DEWITT': 'DE WITT', 'LASALLE': 'LA SALLE' };
   function displayCounty(k) { return title(DATA_TO_GEO[k] || k) + ' County'; }
 
   // ── Helpers ───────────────────────────────────────────────────
@@ -524,6 +533,46 @@
     return m;
   }
 
+  // ── District clipping ─────────────────────────────────────────
+
+  function getDistrictInfo(race) {
+    const m = race.match(/^(\d+)/);
+    if (!m) return null;
+    const num = parseInt(m[1], 10);
+    if (/\bREPRESENTATIVE\b/.test(race)) return { type: 'representative', num };
+    if (/\bSENATE\b/.test(race))         return { type: 'senate',         num };
+    if (/\bCONGRESS\b/.test(race))       return { type: 'congress',       num };
+    return null;
+  }
+
+  async function loadDistrictFeature(race) {
+    if (race === loadedDistrictRace) return;
+    loadedDistrictRace = race;
+    clippedCountyFeatures = null;
+    const info = getDistrictInfo(race);
+    if (!info) { districtFeature = null; return; }
+    const path = DISTRICT_GEOJSON[info.type];
+    if (!districtGeoCache[path]) {
+      const res = await fetch(path);
+      districtGeoCache[path] = await res.json();
+    }
+    districtFeature = districtGeoCache[path].features.find(f => f.properties.district === info.num) || null;
+  }
+
+  function getDisplayFeatures() {
+    if (!districtFeature) return countiesGeo.features;
+    if (!clippedCountyFeatures) {
+      clippedCountyFeatures = countiesGeo.features.reduce((acc, f) => {
+        try {
+          const clipped = turf.intersect(f, districtFeature);
+          if (clipped) { clipped.properties = { ...f.properties }; acc.push(clipped); }
+        } catch (e) { /* skip malformed geometry */ }
+        return acc;
+      }, []);
+    }
+    return clippedCountyFeatures;
+  }
+
   // ── Race dropdown ─────────────────────────────────────────────
 
   function buildRaceDropdown() {
@@ -579,9 +628,14 @@
     });
   }
 
-  function onRaceOrPartyChange() {
+  async function onRaceOrPartyChange() {
     resetModeState();
+    await loadDistrictFeature(currentRace);
     renderMap();
+    if (districtFeature && geojsonLayer) {
+      const bounds = geojsonLayer.getBounds();
+      if (bounds.isValid()) map.fitBounds(bounds, { padding: [24, 24] });
+    }
   }
 
   // ── Mode controls ─────────────────────────────────────────────
@@ -677,7 +731,7 @@
     const chip = document.createElement('span');
     chip.className = `candidate-chip${grp === 'a' ? ' selected-a' : grp === 'b' ? ' selected-b' : grp === 'c' ? ' selected-c' : ''}`;
     chip.textContent = title(name);
-    chip.draggable = !!grp;
+    chip.draggable = true;
 
     chip.addEventListener('click', () => {
       if (grp === null)     { groupA.push(name); }
@@ -819,7 +873,7 @@
     if (currentMode === 'ordering' && !orderingCache && orderingCands.length >= 2) orderingCache = computeOrdering(currentRace, currentParty);
     if (currentParty === 'COMPOSITE' && !compositeCache) compositeCache = computeComposite(currentRace);
 
-    geojsonLayer = L.geoJSON(countiesGeo, {
+    geojsonLayer = L.geoJSON({ type: 'FeatureCollection', features: getDisplayFeatures() }, {
       style: countyStyle,
       onEachFeature(feature, layer) {
         const geo = feature.properties.COUNTY_NAM;
@@ -1506,6 +1560,7 @@
     updateModeVisibility();
     buildHeatSelect();
     setupDropZones();
+    await loadDistrictFeature(currentRace);
     renderMap();
 
     map.fitBounds(geojsonLayer.getBounds(), { padding: [24, 24] });
