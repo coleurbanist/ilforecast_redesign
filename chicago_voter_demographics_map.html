@@ -1,0 +1,1629 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>2026 Chicago Primary — Voter Demographics Map</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+  <style>
+    /* ── Tooltip ── */
+    .cem-tooltip {
+      background: rgba(13,17,23,0.97) !important;
+      border: 1px solid rgba(255,255,255,0.15) !important;
+      border-radius: 8px !important;
+      color: #e6edf3 !important;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.6) !important;
+      padding: 10px 14px !important;
+    }
+    .cem-tooltip::before { display: none !important; }
+
+    /* ── Leaflet chrome ── */
+    .leaflet-control-zoom a {
+      background: #1c2330 !important; color: #e6edf3 !important;
+      border-color: rgba(255,255,255,0.1) !important;
+    }
+    .leaflet-control-zoom a:hover { background: #242d3a !important; }
+    .leaflet-control-attribution {
+      background: rgba(13,17,23,0.8) !important;
+      color: #484f58 !important; font-size: 10px !important;
+    }
+    .leaflet-control-attribution a { color: #484f58 !important; }
+
+    /* ── Loading overlay ── */
+    #loading-overlay {
+      position: fixed; inset: 0; z-index: 99999;
+      background: var(--bg-base);
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 16px;
+      transition: opacity 0.4s;
+    }
+    #loading-overlay.hidden { opacity: 0; pointer-events: none; }
+    .loading-spinner {
+      width: 36px; height: 36px;
+      border: 3px solid rgba(255,255,255,0.1);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-text { color: var(--text-secondary); font-size: 0.875rem; }
+    .loading-sub  { color: var(--text-muted);     font-size: 0.775rem; }
+
+    /* ── Layout ── */
+    .maps-layout {
+      display: flex; flex-direction: column;
+      align-items: stretch; gap: 16px;
+    }
+    .maps-controls {
+      background: var(--bg-surface); border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 8px 16px; display: flex; flex-wrap: wrap; align-items: center;
+      gap: 10px; flex-shrink: 0;
+    }
+    .maps-controls-title {
+      font-size: 0.9rem; font-weight: 600; color: var(--text-primary); margin-right: 4px;
+    }
+    .maps-controls-sub {
+      font-size: 0.8rem; color: var(--text-secondary);
+    }
+
+    /* ── Legend ── */
+    #map-legend {
+      display: flex; align-items: center; gap: 12px;
+      font-size: 0.775rem; color: var(--text-secondary);
+      padding: 6px 0;
+    }
+    .legend-gradient {
+      width: 140px; height: 10px; border-radius: 3px; flex-shrink: 0;
+    }
+    .legend-labels {
+      display: flex; justify-content: space-between; width: 140px;
+      font-size: 0.7rem; color: var(--text-muted);
+    }
+
+    /* ── Detail / citywide panels ── */
+    #detail-panel, #citywide-panel {
+      background: var(--bg-surface); border: 1px solid var(--border);
+      border-radius: var(--radius-lg); padding: 18px 20px;
+    }
+    .detail-header {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 16px; padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+    .detail-title {
+      font-size: 1rem; font-weight: 600; color: var(--text-primary);
+    }
+    .detail-close {
+      background: none; border: 1px solid var(--border); border-radius: 6px;
+      color: var(--text-secondary); font-size: 0.8rem; padding: 3px 10px;
+      cursor: pointer; font-family: var(--font-body);
+    }
+    .detail-close:hover { background: var(--bg-highlight); color: var(--text-primary); }
+    .detail-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 20px;
+    }
+    .detail-section-title {
+      font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);
+      text-transform: uppercase; letter-spacing: 0.05em;
+      margin-bottom: 8px; padding-bottom: 6px;
+      border-bottom: 1px solid var(--border);
+    }
+    .detail-table {
+      width: 100%; border-collapse: collapse; font-size: 0.825rem;
+    }
+    .detail-table td {
+      padding: 3px 0; color: var(--text-primary);
+    }
+    .detail-table td:last-child {
+      text-align: right; font-family: var(--font-mono); color: var(--text-secondary);
+    }
+    .detail-table .subtotal td {
+      border-top: 1px solid var(--border);
+      padding-top: 6px; font-weight: 600; color: var(--text-primary);
+    }
+    .ag-grid {
+      width: 100%; border-collapse: collapse; font-size: 0.775rem;
+    }
+    .ag-grid th {
+      text-align: right; font-weight: 500; color: var(--text-secondary);
+      padding: 3px 6px; font-family: var(--font-mono);
+    }
+    .ag-grid th:first-child { text-align: left; }
+    .ag-grid td {
+      text-align: right; padding: 2px 6px;
+      color: var(--text-primary); font-family: var(--font-mono);
+    }
+    .ag-grid td:first-child { text-align: left; color: var(--text-secondary); }
+    .ag-grid tr:hover td { background: rgba(255,255,255,0.03); }
+
+    @media (max-width: 960px) {
+      .maps-controls { gap: 6px; padding: 6px 12px; }
+      #map-container { height: 360px; }
+    }
+    @media (max-width: 600px) {
+      #map-container { height: 280px; }
+      .btn-toggle { padding: 4px 6px; font-size: 0.7rem; }
+    }
+  </style>
+</head>
+<body>
+
+<div id="loading-overlay">
+  <div class="loading-spinner"></div>
+  <div class="loading-text">Loading precinct data…</div>
+  <div class="loading-sub">This may take a moment on first load</div>
+</div>
+
+<div class="page-content" style="padding-top:24px;padding-bottom:32px">
+  <div class="maps-layout">
+
+    <!-- Controls -->
+    <div class="maps-controls">
+      <span class="maps-controls-title">2026 Chicago Primary</span>
+      <span class="maps-controls-sub">Mail &amp; Early Vote Center Voter Demographics by Precinct</span>
+
+      <div class="control-group">
+        <span class="control-label">View</span>
+        <button class="btn-toggle active" data-view="precinct">Precincts</button>
+        <button class="btn-toggle" data-view="ward">Wards</button>
+      </div>
+
+      <div class="control-group">
+        <span class="control-label">Color by</span>
+        <button class="btn-toggle active" data-mode="em_pct">Mail &amp; EVC Rate</button>
+        <button class="btn-toggle" data-mode="female_pct">Female %</button>
+        <button class="btn-toggle" data-mode="youth">Youth (18–34)</button>
+        <button class="btn-toggle" data-mode="middle">Middle Age (35–64)</button>
+        <button class="btn-toggle" data-mode="senior">Senior (65+)</button>
+        <button class="btn-toggle" data-mode="turnout_pct">Turnout Rate</button>
+        <button class="btn-toggle" data-mode="dem_pct">Dem Ballot %</button>
+        <button class="btn-toggle" data-mode="gop_pct">GOP Ballot %</button>
+        <button class="btn-toggle" data-mode="lib_pct">Lib Ballot %</button>
+      </div>
+    </div>
+
+    <!-- Map -->
+    <div id="map-container"></div>
+
+    <!-- Disclaimer -->
+    <div style="font-size:0.775rem;color:var(--text-muted);padding:2px 0">
+      <strong style="color:var(--text-secondary)">Note:</strong>
+      Age and gender breakdowns on a precinct/ward level reflect mail and early vote center voters only — in-precinct voters cannot be linked to individual precincts or wards.
+      In-precinct vote <em>counts</em> are derived from official Board of Elections precinct totals.
+      Early Vote Centers (EVC) are where all in-person early voting takes place; approximately 21,000 election-day votes are also cast at Early Vote Centers and are counted here rather than as in-precinct votes.
+      <span style="display:block;margin-top:5px">
+        <strong style="color:var(--text-secondary)">Notes on vote method coverage:</strong>
+        The "Mail &amp; EVC" figures also include approximately 5,600 grace-period, 1,600 provisional, and 1,400 nursing-home ballots — all non-in-precinct methods — which together represent about 3.6% of the Mail &amp; EVC total.
+        About 3,800 voters who requested a mail ballot ultimately voted in-precinct instead; these are correctly excluded from the Mail &amp; EVC figures and counted as in-precinct votes.
+      </span>
+    </div>
+
+    <!-- Legend -->
+    <div id="map-legend"></div>
+
+    <!-- Detail panel (hidden until precinct clicked) -->
+    <div id="detail-panel" style="display:none"></div>
+
+    <!-- Citywide panel (always visible after data loads) -->
+    <div id="citywide-panel" style="display:none"></div>
+
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3/dist/chartjs-plugin-annotation.min.js"></script>
+<script src="nav.js"></script>
+<script>
+(() => {
+  'use strict';
+
+  // ── Config ──────────────────────────────────────────────────────────────────
+  const GEOJSON_PATH      = 'data/chicago_precincts.geojson';
+  const DATA_PATH         = 'data/chicago_2026_demographics.json';
+  const WARD_GEOJSON_PATH = 'data/chicago_wards.geojson';
+  const WARD_DATA_PATH    = 'data/chicago_2026_ward_demographics.json';
+  const AGE_ORDER         = ['18-24','25-34','35-44','45-54','55-64','65-74','75+'];
+
+  const MODE_CONFIG = {
+    em_pct:      { label: 'Mail & EVC Rate',     unit: '%', lo: '#1c2330', hi: '#4f93d1', min: 0,  max: 100, diverge: false },
+    female_pct:  { label: 'Female %',           unit: '%', lo: '#d16f4f', hi: '#4f93d1', min: 30, max: 80,  diverge: true,  mid: 54 },
+    youth:       { label: 'Youth (18–34) %',        unit: '%', lo: '#1c2330', hi: '#2ecc71', min: 0,  max: 50,  diverge: false },
+    middle:      { label: 'Middle-Aged (35–64) %',  unit: '%', lo: '#1c2330', hi: '#1abc9c', min: 0,  max: 60,  diverge: false },
+    senior:      { label: 'Senior (65+) %',         unit: '%', lo: '#1c2330', hi: '#e67e22', min: 0,  max: 45,  diverge: false },
+    turnout_pct: { label: 'Turnout Rate',            unit: '%', lo: '#1c2330', hi: '#9b59b6', min: 0,  max: 100, diverge: false },
+    dem_pct:     { label: 'Democratic Ballot %',     unit: '%', lo: '#1c2330', hi: '#4f93d1', min: 0,  max: 100, diverge: false },
+    gop_pct:     { label: 'Republican Ballot %',     unit: '%', lo: '#1c2330', hi: '#e74c3c', min: 0,  max: 10,  diverge: false },
+    lib_pct:     { label: 'Libertarian Ballot %',    unit: '%', lo: '#1c2330', hi: '#f1c40f', min: 0,  max: 100, diverge: false },
+  };
+
+  // ── State ───────────────────────────────────────────────────────────────────
+  let map           = null;
+  let geoLayer      = null;
+  let data          = {};
+  let geojson       = null;
+  let meta          = null;
+  let wardData      = null;
+  let wardGeojson   = null;
+  let selectedWardData = null;   // data record for the currently-open ward detail
+  let PRECINCT_RANGES = {};      // data-driven {min,max} per mode, set in init()
+  let WARD_RANGES     = {};      // same for ward view, set on first switch
+  let citywideAgg     = null;    // citywide ballot+registration totals, set in init()
+  let tsChart       = null;
+  let tsChart2      = null;
+  let wardTsChart   = null;
+  let wardTsChart2  = null;
+  let currentView    = 'precinct';
+  let currentMode    = 'em_pct';
+  let currentTsMode  = 'total';
+  let currentTsMode2 = 'total';
+  let currentWardTs  = 'total';
+  let currentWardTs2 = 'total';
+  let tsGenderFilter  = new Set(['F', 'M']);
+  let tsAgeFilter     = new Set(['18-24','25-34','35-44','45-54','55-64','65-74','75+']);
+  let tsGenderFilter2 = new Set(['F', 'M']);
+  let tsAgeFilter2    = new Set(['18-24','25-34','35-44','45-54','55-64','65-74','75+']);
+  let wardTsGenderFilter  = new Set(['F', 'M']);
+  let wardTsAgeFilter     = new Set(['18-24','25-34','35-44','45-54','55-64','65-74','75+']);
+  let wardTsGenderFilter2 = new Set(['F', 'M']);
+  let wardTsAgeFilter2    = new Set(['18-24','25-34','35-44','45-54','55-64','65-74','75+']);
+
+  const AGE_COLORS = {
+    '18-24': '#4e79a7', '25-34': '#f28e2b', '35-44': '#e15759',
+    '45-54': '#76b7b2', '55-64': '#59a14f', '65-74': '#edc948', '75+': '#b07aa1',
+  };
+
+  // ── Data-driven color scale ranges ──────────────────────────────────────────
+  // Computes {min, max} for every mode from an array of data records.
+  // Called once for precincts in init() and once for wards on first view switch.
+  function computeRanges(records) {
+    const withBoe = records.filter(d => d.total_boe > 0);
+    const withEm  = records.filter(d => d.em > 0);
+    const withReg = records.filter(d => d.registered > 0);
+    const fl  = arr => Math.floor(Math.min(...arr));
+    const cl  = arr => Math.ceil(Math.max(...arr));
+    return {
+      em_pct:      { min: fl(withBoe.map(d => d.em_pct)),
+                     max: cl(withBoe.map(d => d.em_pct)) },
+      female_pct:  { min: fl(withEm.map(d => d.female_pct)),
+                     max: cl(withEm.map(d => d.female_pct)) },
+      youth:       { min: fl(withEm.map(d => (d.age_pct['18-24']||0)+(d.age_pct['25-34']||0))),
+                     max: cl(withEm.map(d => (d.age_pct['18-24']||0)+(d.age_pct['25-34']||0))) },
+      middle:      { min: fl(withEm.map(d => (d.age_pct['35-44']||0)+(d.age_pct['45-54']||0)+(d.age_pct['55-64']||0))),
+                     max: cl(withEm.map(d => (d.age_pct['35-44']||0)+(d.age_pct['45-54']||0)+(d.age_pct['55-64']||0))) },
+      senior:      { min: fl(withEm.map(d => (d.age_pct['65-74']||0)+(d.age_pct['75+']||0))),
+                     max: cl(withEm.map(d => (d.age_pct['65-74']||0)+(d.age_pct['75+']||0))) },
+      turnout_pct: { min: fl(withReg.map(d => d.turnout_pct)),
+                     max: Math.min(100, cl(withReg.map(d => d.turnout_pct))) },
+      dem_pct:     { min: fl(withBoe.map(d => d.dem_pct)),
+                     max: cl(withBoe.map(d => d.dem_pct)) },
+      gop_pct:     { min: 0,
+                     max: +Math.max(...withBoe.map(d => d.gop / d.total_boe * 100)).toFixed(1) },
+      lib_pct:     { min: 0,
+                     max: +Math.max(...withBoe.map(d => d.lib / d.total_boe * 100)).toFixed(1) },
+    };
+  }
+
+  // Returns the active {min, max} for a mode based on current view
+  function activeRange(mode) {
+    const r = currentView === 'ward' ? WARD_RANGES[mode] : PRECINCT_RANGES[mode];
+    return r || { min: MODE_CONFIG[mode].min, max: MODE_CONFIG[mode].max };
+  }
+
+  // ── Color utilities ─────────────────────────────────────────────────────────
+  function hexToRgb(hex) {
+    const r = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return r ? { r: parseInt(r[1],16), g: parseInt(r[2],16), b: parseInt(r[3],16) } : {r:128,g:128,b:128};
+  }
+  function lerpColor(a, b, t) {
+    const ca = hexToRgb(a), cb = hexToRgb(b);
+    t = Math.max(0, Math.min(1, t));
+    return `rgb(${Math.round(ca.r+(cb.r-ca.r)*t)},${Math.round(ca.g+(cb.g-ca.g)*t)},${Math.round(ca.b+(cb.b-ca.b)*t)})`;
+  }
+
+  function getColor(value, mode) {
+    const cfg = MODE_CONFIG[mode];
+    const { min, max } = activeRange(mode);
+    if (value === null || value === undefined) return '#1c2330';
+    if (cfg.diverge) {
+      const mid = cfg.mid || 50;
+      if (value <= mid) {
+        const t = Math.max(0, Math.min(1, (mid - value) / (mid - min)));
+        return lerpColor('#7a7a7a', cfg.lo, t);
+      } else {
+        const t = Math.max(0, Math.min(1, (value - mid) / (max - mid)));
+        return lerpColor('#7a7a7a', cfg.hi, t);
+      }
+    } else {
+      const t = Math.max(0, Math.min(1, (value - min) / (max - min)));
+      return lerpColor(cfg.lo, cfg.hi, t);
+    }
+  }
+
+  function getMetricValue(d, mode) {
+    if (!d) return null;
+    if (mode === 'em_pct')      return d.em_pct;
+    if (mode === 'female_pct')  return d.female_pct;
+    if (mode === 'youth')       return (d.age_pct['18-24'] || 0) + (d.age_pct['25-34'] || 0);
+    if (mode === 'middle')      return (d.age_pct['35-44'] || 0) + (d.age_pct['45-54'] || 0) + (d.age_pct['55-64'] || 0);
+    if (mode === 'senior')      return (d.age_pct['65-74'] || 0) + (d.age_pct['75+'] || 0);
+    if (mode === 'turnout_pct') return d.turnout_pct;
+    if (mode === 'dem_pct')     return d.dem_pct;
+    if (mode === 'gop_pct')     return d.total_boe > 0 ? d.gop / d.total_boe * 100 : null;
+    if (mode === 'lib_pct')     return d.total_boe > 0 ? d.lib / d.total_boe * 100 : null;
+    return null;
+  }
+
+  // ── Normalize JoinField for lookup ──────────────────────────────────────────
+  function normJF(jf) {
+    if (!jf) return '';
+    // GeoJSON is "CITY OF CHICAGO:Ward 01 Precinct 01" → uppercase → match data keys
+    return jf.trim().toUpperCase().replace(/\s+/g,' ');
+  }
+
+  function lookupData(jf) {
+    // Data keys: "CITY OF CHICAGO:WARD 01 PRECINCT 01"
+    const key = normJF(jf);
+    return data[key] || null;
+  }
+
+  function lookupWardData(wardProp) {
+    // wardProp is the feature's ward property (string like '1' or '46')
+    if (!wardData) return null;
+    return wardData[String(parseInt(wardProp))] || null;
+  }
+
+  // ── Feature lookup — returns data record regardless of current view ──────────
+  function lookupFeatureData(feature) {
+    if (currentView === 'ward') return lookupWardData(feature.properties.ward);
+    return lookupData(feature.properties.JoinField);
+  }
+
+  // ── Precinct label ───────────────────────────────────────────────────────────
+  function precinctLabel(jf, d) {
+    if (d) return `Ward ${d.ward} · Precinct ${d.precinct}`;
+    const m = jf && jf.match(/Ward\s+(\d+)\s+Precinct\s+(\d+)/i);
+    return m ? `Ward ${parseInt(m[1])} · Precinct ${parseInt(m[2])}` : jf;
+  }
+
+  function wardLabel(wardProp) {
+    return `Ward ${parseInt(wardProp)}`;
+  }
+
+  // ── Tooltip HTML ─────────────────────────────────────────────────────────────
+  // Called from renderLayer's mousemove with already-resolved data + label
+  function tooltipHtml(d, label, mode) {
+    if (!d) {
+      return `<div style="font-family:'DM Sans',sans-serif;font-size:12px">
+        <div style="font-weight:600;margin-bottom:4px">${label}</div>
+        <div style="color:#8b949e">No data</div>
+      </div>`;
+    }
+
+    const emPct = d.total_boe > 0 ? d.em_pct : 0;
+    const header = `
+      <div style="font-family:'DM Sans',sans-serif;font-size:12px;min-width:210px">
+        <div style="font-weight:600;margin-bottom:6px;border-bottom:1px solid rgba(255,255,255,0.2);padding-bottom:4px">
+          ${label}
+        </div>
+        <table style="width:100%;border-collapse:collapse;margin-bottom:6px">
+          <tr>
+            <td style="color:#8b949e">Mail &amp; Early Vote Center</td>
+            <td style="text-align:right;font-family:monospace">${d.em.toLocaleString()} (${emPct}%)</td>
+          </tr>
+          <tr>
+            <td style="color:#8b949e">In-Precinct</td>
+            <td style="text-align:right;font-family:monospace">${(d.ed ?? '—').toLocaleString()}</td>
+          </tr>
+          <tr>
+            <td style="color:#8b949e;border-top:1px solid rgba(255,255,255,0.1);padding-top:4px">Total</td>
+            <td style="text-align:right;font-family:monospace;border-top:1px solid rgba(255,255,255,0.1);padding-top:4px">${(d.total_boe ?? d.em).toLocaleString()}</td>
+          </tr>
+        </table>`;
+
+    let detail = '';
+
+    if (mode === 'female_pct') {
+      detail = `
+        <div style="border-top:1px solid rgba(255,255,255,0.1);padding-top:6px">
+          <table style="width:100%;border-collapse:collapse">
+            <tr>
+              <td><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#4f93d1;margin-right:5px"></span>Female</td>
+              <td style="text-align:right;font-family:monospace">${d.female.toLocaleString()} (${d.female_pct}%)</td>
+            </tr>
+            <tr>
+              <td><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#d16f4f;margin-right:5px"></span>Male</td>
+              <td style="text-align:right;font-family:monospace">${d.male.toLocaleString()} (${d.male_pct}%)</td>
+            </tr>
+            ${d.other > 0 ? `<tr>
+              <td><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#7a7a7a;margin-right:5px"></span>Other/Undisclosed</td>
+              <td style="text-align:right;font-family:monospace">${d.other.toLocaleString()} (${d.other_pct}%)</td>
+            </tr>` : ''}
+          </table>
+        </div>`;
+
+    } else if (mode === 'youth' || mode === 'middle' || mode === 'senior') {
+      const rows = AGE_ORDER.map(b => {
+        const pct = d.age_pct[b] || 0;
+        const n   = d.age[b] || 0;
+        const highlight = (mode === 'youth'  && (b === '18-24' || b === '25-34')) ||
+                          (mode === 'middle' && (b === '35-44' || b === '45-54' || b === '55-64')) ||
+                          (mode === 'senior' && (b === '65-74' || b === '75+'));
+        return `<tr>
+          <td style="color:${highlight ? '#e6edf3' : '#8b949e'}">${b}</td>
+          <td style="text-align:right;font-family:monospace;color:${highlight ? '#e6edf3' : '#8b949e'}">${n.toLocaleString()} (${pct}%)</td>
+        </tr>`;
+      }).join('');
+      detail = `
+        <div style="border-top:1px solid rgba(255,255,255,0.1);padding-top:6px">
+          <table style="width:100%;border-collapse:collapse">${rows}</table>
+        </div>`;
+
+    } else if (mode === 'turnout_pct') {
+      const reg = d.registered || 0;
+      const tot = d.total_boe  || 0;
+      detail = `
+        <div style="border-top:1px solid rgba(255,255,255,0.1);padding-top:6px">
+          <table style="width:100%;border-collapse:collapse">
+            <tr><td style="color:#8b949e">Registered</td><td style="text-align:right;font-family:monospace">${reg.toLocaleString()}</td></tr>
+            <tr><td style="color:#8b949e">Total votes</td><td style="text-align:right;font-family:monospace">${tot.toLocaleString()}</td></tr>
+            <tr><td style="color:#e6edf3;font-weight:600">Turnout</td><td style="text-align:right;font-family:monospace;font-weight:600">${d.turnout_pct}%</td></tr>
+          </table>
+        </div>`;
+
+    } else if (mode === 'dem_pct' || mode === 'gop_pct' || mode === 'lib_pct') {
+      const tot = d.total_boe || 0;
+      const dem = d.dem || 0, gop = d.gop || 0, lib = d.lib || 0;
+      const demPct = tot > 0 ? (dem/tot*100).toFixed(1) : '—';
+      const gopPct = tot > 0 ? (gop/tot*100).toFixed(1) : '—';
+      const libPct = tot > 0 ? (lib/tot*100).toFixed(1) : '—';
+      detail = `
+        <div style="border-top:1px solid rgba(255,255,255,0.1);padding-top:6px">
+          <table style="width:100%;border-collapse:collapse">
+            <tr>
+              <td><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#4f93d1;margin-right:5px"></span>Democratic</td>
+              <td style="text-align:right;font-family:monospace">${dem.toLocaleString()} (${demPct}%)</td>
+            </tr>
+            <tr>
+              <td><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#d16f4f;margin-right:5px"></span>Republican</td>
+              <td style="text-align:right;font-family:monospace">${gop.toLocaleString()} (${gopPct}%)</td>
+            </tr>
+            <tr>
+              <td><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#f1c40f;margin-right:5px"></span>Libertarian</td>
+              <td style="text-align:right;font-family:monospace">${lib.toLocaleString()} (${libPct}%)</td>
+            </tr>
+          </table>
+        </div>`;
+
+    } else {
+      // em_pct mode — bar chart hint
+      const barW = Math.round(emPct * 1.4);
+      detail = `
+        <div style="border-top:1px solid rgba(255,255,255,0.1);padding-top:6px">
+          <div style="font-size:11px;color:#8b949e;margin-bottom:4px">Mail &amp; EVC share of total votes</div>
+          <div style="background:rgba(255,255,255,0.08);border-radius:3px;height:6px;width:140px">
+            <div style="background:#4f93d1;border-radius:3px;height:6px;width:${barW}px"></div>
+          </div>
+        </div>`;
+    }
+
+    const clickHint = currentView === 'ward' ? 'Click ward for full breakdown' : 'Click precinct for full breakdown';
+    return header + detail + `<div style="margin-top:6px;color:#484f58;font-size:10px">${clickHint}</div></div>`;
+  }
+
+  // ── Layer style ──────────────────────────────────────────────────────────────
+  function featureStyle(feature) {
+    const d = lookupFeatureData(feature);
+    const v = getMetricValue(d, currentMode);
+    const color = getColor(v, currentMode);
+    const w = currentView === 'ward' ? 1 : 0.4;
+    return { fillColor: color, fillOpacity: 0.82, color: '#0d1117', weight: w, smoothFactor: 0 };
+  }
+
+  // ── Legend ───────────────────────────────────────────────────────────────────
+  // ── Citywide summary stat for the current color mode ─────────────────────────
+  function getCitywideStatText(mode) {
+    if (!meta || !citywideAgg) return '';
+    const em  = meta.citywide_em;
+    switch (mode) {
+      case 'em_pct':
+        return `Citywide mail &amp; EVC rate: <strong>${em.em_pct}%</strong>`;
+      case 'female_pct':
+        return `Citywide female share (Mail &amp; EVC): <strong>${em.female_pct}%</strong>`;
+      case 'youth': {
+        const pct = ((em.age_pct['18-24']||0) + (em.age_pct['25-34']||0)).toFixed(1);
+        return `Citywide ages 18–34 (Mail &amp; EVC): <strong>${pct}%</strong>`;
+      }
+      case 'middle': {
+        const pct = ((em.age_pct['35-44']||0) + (em.age_pct['45-54']||0) + (em.age_pct['55-64']||0)).toFixed(1);
+        return `Citywide ages 35–64 (Mail &amp; EVC): <strong>${pct}%</strong>`;
+      }
+      case 'senior': {
+        const pct = ((em.age_pct['65-74']||0) + (em.age_pct['75+']||0)).toFixed(1);
+        return `Citywide ages 65+ (Mail &amp; EVC): <strong>${pct}%</strong>`;
+      }
+      case 'turnout_pct': {
+        const pct = (citywideAgg.total_boe / citywideAgg.registered * 100).toFixed(1);
+        return `Citywide turnout: <strong>${pct}%</strong>`;
+      }
+      case 'dem_pct': {
+        const pct = (citywideAgg.dem / citywideAgg.total_boe * 100).toFixed(1);
+        return `Citywide Democratic ballot: <strong>${pct}%</strong>`;
+      }
+      case 'gop_pct': {
+        const pct = (citywideAgg.gop / citywideAgg.total_boe * 100).toFixed(1);
+        return `Citywide Republican ballot: <strong>${pct}%</strong>`;
+      }
+      case 'lib_pct': {
+        const pct = (citywideAgg.lib / citywideAgg.total_boe * 100).toFixed(1);
+        return `Citywide Libertarian ballot: <strong>${pct}%</strong>`;
+      }
+      default: return '';
+    }
+  }
+
+  function updateLegend() {
+    const cfg = MODE_CONFIG[currentMode];
+    const el  = document.getElementById('map-legend');
+    if (!cfg) { el.innerHTML = ''; return; }
+
+    const { min, max } = activeRange(currentMode);
+
+    let gradientCSS;
+    if (cfg.diverge) {
+      const mid = cfg.mid || 50;
+      const midPct = ((mid - min) / (max - min) * 100).toFixed(0);
+      gradientCSS = `linear-gradient(to right, ${cfg.lo}, #7a7a7a ${midPct}%, ${cfg.hi})`;
+    } else {
+      gradientCSS = `linear-gradient(to right, ${cfg.lo}, ${cfg.hi})`;
+    }
+
+    const statText = getCitywideStatText(currentMode);
+    el.innerHTML = `
+      <span style="color:var(--text-secondary);font-size:0.775rem">${cfg.label}:</span>
+      <div>
+        <div class="legend-gradient" style="background:${gradientCSS}"></div>
+        <div class="legend-labels">
+          <span>${min}${cfg.unit}</span>
+          ${cfg.diverge ? `<span>${cfg.mid}${cfg.unit}</span>` : ''}
+          <span>${max}${cfg.unit}</span>
+        </div>
+      </div>
+      ${statText ? `<span style="font-size:0.775rem;color:var(--text-secondary);
+          background:rgba(255,255,255,0.05);border:1px solid var(--border);
+          border-radius:5px;padding:2px 9px;white-space:nowrap">${statText}</span>` : ''}
+      <span style="color:var(--text-muted);font-size:0.75rem;margin-left:auto">
+        Mail &amp; early vote center voters only (${(236356).toLocaleString()} geo-tagged) · In-precinct counts from official results
+      </span>`;
+  }
+
+  // ── Citywide section HTML (gender + age + age×gender, no vote-method breakdown) ──
+  function citywideGridHtml(d, totalLabel, totalCount) {
+    const agRows = AGE_ORDER.map(b => {
+      const f   = d.age_gender[`${b}_F`] || 0;
+      const m   = d.age_gender[`${b}_M`] || 0;
+      const tot = f + m;
+      const fp  = tot > 0 ? (f/tot*100).toFixed(0) : '—';
+      const mp  = tot > 0 ? (m/tot*100).toFixed(0) : '—';
+      return `<tr>
+        <td>${b}</td>
+        <td>${f.toLocaleString()}</td><td style="color:var(--text-muted)">${fp}%</td>
+        <td>${m.toLocaleString()}</td><td style="color:var(--text-muted)">${mp}%</td>
+        <td>${tot.toLocaleString()}</td>
+      </tr>`;
+    }).join('');
+    const agTotF = AGE_ORDER.reduce((s,b) => s + (d.age_gender[`${b}_F`]||0), 0);
+    const agTotM = AGE_ORDER.reduce((s,b) => s + (d.age_gender[`${b}_M`]||0), 0);
+
+    return `
+      <div class="detail-grid">
+
+        <div>
+          <div class="detail-section-title">Vote Total</div>
+          <table class="detail-table">
+            <tr class="subtotal"><td>${totalLabel}</td><td>${totalCount.toLocaleString()}</td></tr>
+          </table>
+        </div>
+
+        <div>
+          <div class="detail-section-title">Gender</div>
+          <table class="detail-table">
+            <tr><td>Female</td><td>${d.female.toLocaleString()} (${d.female_pct}%)</td></tr>
+            <tr><td>Male</td>  <td>${d.male.toLocaleString()} (${d.male_pct}%)</td></tr>
+            ${d.other > 0 ? `<tr><td>Other/Undisclosed</td><td>${d.other.toLocaleString()} (${d.other_pct}%)</td></tr>` : ''}
+            <tr class="subtotal"><td>Total</td><td>${(d.female+d.male+d.other).toLocaleString()}</td></tr>
+          </table>
+        </div>
+
+        <div>
+          <div class="detail-section-title">Age Bracket</div>
+          <table class="detail-table">
+            ${AGE_ORDER.map(b => `<tr><td>${b}</td><td>${(d.age[b]||0).toLocaleString()} (${d.age_pct[b]||0}%)</td></tr>`).join('')}
+            <tr class="subtotal"><td>Total</td><td>${AGE_ORDER.reduce((s,b)=>s+(d.age[b]||0),0).toLocaleString()}</td></tr>
+          </table>
+        </div>
+
+        <div>
+          <div class="detail-section-title">Age × Gender</div>
+          <table class="ag-grid">
+            <thead>
+              <tr><th></th><th>Female</th><th>F%</th><th>Male</th><th>M%</th><th>Total</th></tr>
+            </thead>
+            <tbody>
+              ${agRows}
+              <tr style="border-top:1px solid var(--border);font-weight:600">
+                <td style="color:var(--text-primary)">Total</td>
+                <td>${agTotF.toLocaleString()}</td><td></td>
+                <td>${agTotM.toLocaleString()}</td><td></td>
+                <td>${(agTotF+agTotM).toLocaleString()}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+      </div>`;
+  }
+
+  function cwSectionHeader(title) {
+    return `<div style="margin:20px 0 14px;padding-top:18px;border-top:1px solid var(--border);
+                font-size:0.85rem;font-weight:600;color:var(--text-secondary);
+                text-transform:uppercase;letter-spacing:0.05em">${title}</div>`;
+  }
+
+  // ── Shared detail grid HTML ───────────────────────────────────────────────────
+  function detailGridHtml(d) {
+    const emPct  = d.em_pct;
+    const agRows = AGE_ORDER.map(b => {
+      const f   = d.age_gender[`${b}_F`] || 0;
+      const m   = d.age_gender[`${b}_M`] || 0;
+      const tot = f + m;
+      const fp  = tot > 0 ? (f/tot*100).toFixed(0) : '—';
+      const mp  = tot > 0 ? (m/tot*100).toFixed(0) : '—';
+      return `<tr>
+        <td>${b}</td>
+        <td>${f.toLocaleString()}</td><td style="color:var(--text-muted)">${fp}%</td>
+        <td>${m.toLocaleString()}</td><td style="color:var(--text-muted)">${mp}%</td>
+        <td>${tot.toLocaleString()}</td>
+      </tr>`;
+    }).join('');
+    const agTotF = AGE_ORDER.reduce((s,b) => s + (d.age_gender[`${b}_F`]||0), 0);
+    const agTotM = AGE_ORDER.reduce((s,b) => s + (d.age_gender[`${b}_M`]||0), 0);
+
+    return `
+      <div class="detail-grid">
+
+        <div>
+          <div class="detail-section-title">Vote Totals</div>
+          <table class="detail-table">
+            <tr><td>Mail &amp; Early Vote Center</td><td>${d.em.toLocaleString()} (${emPct}%)</td></tr>
+            <tr><td>In-Precinct</td><td>${(d.ed ?? '—').toLocaleString()}</td></tr>
+            <tr class="subtotal"><td>Total</td><td>${(d.total_boe ?? d.em).toLocaleString()}</td></tr>
+          </table>
+        </div>
+
+        <div>
+          <div class="detail-section-title">Gender (Mail &amp; EVC)</div>
+          <table class="detail-table">
+            <tr><td>Female</td><td>${d.female.toLocaleString()} (${d.female_pct}%)</td></tr>
+            <tr><td>Male</td>  <td>${d.male.toLocaleString()} (${d.male_pct}%)</td></tr>
+            ${d.other > 0 ? `<tr><td>Other/Undisclosed</td><td>${d.other.toLocaleString()} (${d.other_pct}%)</td></tr>` : ''}
+            <tr class="subtotal"><td>Total</td><td>${d.em.toLocaleString()}</td></tr>
+          </table>
+        </div>
+
+        <div>
+          <div class="detail-section-title">Age Bracket (Mail &amp; EVC)</div>
+          <table class="detail-table">
+            ${AGE_ORDER.map(b => `<tr><td>${b}</td><td>${(d.age[b]||0).toLocaleString()} (${d.age_pct[b]||0}%)</td></tr>`).join('')}
+            <tr class="subtotal"><td>Total</td><td>${AGE_ORDER.reduce((s,b)=>s+(d.age[b]||0),0).toLocaleString()}</td></tr>
+          </table>
+        </div>
+
+        <div>
+          <div class="detail-section-title">Age × Gender (Mail &amp; EVC)</div>
+          <table class="ag-grid">
+            <thead>
+              <tr><th></th><th>Female</th><th>F%</th><th>Male</th><th>M%</th><th>Total</th></tr>
+            </thead>
+            <tbody>
+              ${agRows}
+              <tr style="border-top:1px solid var(--border);font-weight:600">
+                <td style="color:var(--text-primary)">Total</td>
+                <td>${agTotF.toLocaleString()}</td><td></td>
+                <td>${agTotM.toLocaleString()}</td><td></td>
+                <td>${(agTotF+agTotM).toLocaleString()}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+      </div>`;
+  }
+
+  // ── Time series chart ────────────────────────────────────────────────────────
+  const TS_CHART_OPTS = {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    scales: {
+      x: {
+        type: 'linear',
+        title: { display: true, text: 'Days relative to election day', color: '#8b949e', font: { size: 11 } },
+        grid: { color: 'rgba(255,255,255,0.05)' },
+        ticks: { color: '#8b949e', stepSize: 7 },
+      },
+      y: {
+        title: { display: true, text: 'Cumulative votes', color: '#8b949e', font: { size: 11 } },
+        grid: { color: 'rgba(255,255,255,0.05)' },
+        ticks: { color: '#8b949e', callback: v => v >= 1000 ? (v/1000).toFixed(0)+'k' : v },
+      },
+    },
+    plugins: {
+      legend: {
+        position: 'bottom',
+        labels: { color: '#e6edf3', font: { family: "'DM Sans',sans-serif", size: 10 }, boxWidth: 12, padding: 10 },
+      },
+      tooltip: {
+        backgroundColor: 'rgba(13,17,23,0.95)',
+        titleColor: '#e6edf3', bodyColor: '#8b949e',
+        borderColor: 'rgba(255,255,255,0.15)', borderWidth: 1,
+        callbacks: { label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y.toLocaleString()}` },
+      },
+      annotation: {
+        annotations: {
+          elecDay: {
+            type: 'line', xMin: 0, xMax: 0,
+            borderColor: 'rgba(255,255,255,0.35)', borderWidth: 1, borderDash: [4, 3],
+            label: { content: 'Election Day', display: true, position: 'start',
+                     color: '#8b949e', font: { size: 10 }, backgroundColor: 'transparent', padding: 2 },
+          },
+        },
+      },
+    },
+  };
+
+  function renderTsChart(tsMode) {
+    const ts  = meta.time_series;
+    const days = ts.days;
+    let datasets = [];
+
+    if (tsMode === 'total') {
+      datasets = [{ label: 'All Voters', data: ts.total,
+        borderColor: '#4f93d1', backgroundColor: 'rgba(79,147,209,0.08)',
+        fill: true, tension: 0.4, cubicInterpolationMode: 'monotone', pointRadius: 1.5 }];
+
+    } else if (tsMode === 'gender') {
+      datasets = [
+        { label: 'Female', data: ts.gender['F'], borderColor: '#e57373', tension: 0.4, cubicInterpolationMode: 'monotone', pointRadius: 1.5 },
+        { label: 'Male',   data: ts.gender['M'], borderColor: '#64b5f6', tension: 0.4, cubicInterpolationMode: 'monotone', pointRadius: 1.5 },
+      ];
+
+    } else if (tsMode === 'age') {
+      datasets = AGE_ORDER.map(b => ({
+        label: b, data: ts.age[b],
+        borderColor: AGE_COLORS[b], tension: 0.4, cubicInterpolationMode: 'monotone', pointRadius: 1,
+      }));
+
+    } else if (tsMode === 'age_gender') {
+      datasets = AGE_ORDER
+        .filter(b => tsAgeFilter.has(b))
+        .flatMap(b => {
+          const ds = [];
+          if (tsGenderFilter.has('F')) ds.push({
+            label: `${b} F`, data: ts.age_gender[`${b}_F`],
+            borderColor: AGE_COLORS[b], borderDash: [5, 3], tension: 0.4, cubicInterpolationMode: 'monotone', pointRadius: 0,
+          });
+          if (tsGenderFilter.has('M')) ds.push({
+            label: `${b} M`, data: ts.age_gender[`${b}_M`],
+            borderColor: AGE_COLORS[b], tension: 0.4, cubicInterpolationMode: 'monotone', pointRadius: 0,
+          });
+          return ds;
+        });
+    }
+
+    // Convert parallel arrays to {x,y} point objects for linear scale
+    const pointify = arr => arr.map((y, i) => ({ x: days[i], y }));
+    datasets = datasets.map(ds => ({ ...ds, data: pointify(ds.data) }));
+
+    if (tsChart) { tsChart.destroy(); tsChart = null; }
+
+    const ctx = document.getElementById('ts-canvas');
+    if (!ctx) return;
+    tsChart = new Chart(ctx, {
+      type: 'line',
+      data: { datasets },
+      options: TS_CHART_OPTS,
+    });
+  }
+
+  // ── Chart 2 — electorate composition share ───────────────────────────────────
+  const TS_SHARE_OPTS = {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    scales: {
+      x: {
+        type: 'linear',
+        title: { display: true, text: 'Days relative to election day', color: '#8b949e', font: { size: 11 } },
+        grid: { color: 'rgba(255,255,255,0.05)' },
+        ticks: { color: '#8b949e', stepSize: 7 },
+      },
+      y: {
+        title: { display: true, text: '% of cumulative votes', color: '#8b949e', font: { size: 11 } },
+        grid: { color: 'rgba(255,255,255,0.05)' },
+        ticks: { color: '#8b949e', callback: v => v.toFixed(1) + '%' },
+      },
+    },
+    plugins: {
+      legend: {
+        position: 'bottom',
+        labels: { color: '#e6edf3', font: { family: "'DM Sans',sans-serif", size: 10 }, boxWidth: 12, padding: 10 },
+      },
+      tooltip: {
+        backgroundColor: 'rgba(13,17,23,0.95)',
+        titleColor: '#e6edf3', bodyColor: '#8b949e',
+        borderColor: 'rgba(255,255,255,0.15)', borderWidth: 1,
+        callbacks: { label: ctx => ctx.parsed.y != null ? ` ${ctx.dataset.label}: ${ctx.parsed.y.toFixed(1)}%` : ` ${ctx.dataset.label}: —` },
+      },
+      annotation: {
+        annotations: {
+          elecDay: {
+            type: 'line', xMin: 0, xMax: 0,
+            borderColor: 'rgba(255,255,255,0.35)', borderWidth: 1, borderDash: [4, 3],
+            label: { content: 'Election Day', display: true, position: 'start',
+                     color: '#8b949e', font: { size: 10 }, backgroundColor: 'transparent', padding: 2 },
+          },
+        },
+      },
+    },
+  };
+
+  // Divide numerator array by denominator array element-wise → %, nulling low-volume days
+  function shareOf(num, denom, minDenom = 200) {
+    return num.map((n, i) => denom[i] >= minDenom ? n / denom[i] * 100 : null);
+  }
+
+  function renderTsChart2(tsMode) {
+    const ts    = meta.time_series;
+    const days  = ts.days;
+    const total = ts.total;
+    const final = total[total.length - 1];
+    let datasets = [];
+
+    if (tsMode === 'total') {
+      // Pace: what % of the final total has been cast by each day
+      datasets = [{ label: '% of final total cast', data: total.map(c => c / final * 100),
+        borderColor: '#4f93d1', backgroundColor: 'rgba(79,147,209,0.08)',
+        fill: true, tension: 0.4, cubicInterpolationMode: 'monotone', pointRadius: 1.5 }];
+
+    } else if (tsMode === 'gender') {
+      datasets = [
+        { label: 'Female %', data: shareOf(ts.gender['F'], total), borderColor: '#e57373',
+          tension: 0.4, cubicInterpolationMode: 'monotone', pointRadius: 1.5 },
+        { label: 'Male %',   data: shareOf(ts.gender['M'], total), borderColor: '#64b5f6',
+          tension: 0.4, cubicInterpolationMode: 'monotone', pointRadius: 1.5 },
+      ];
+
+    } else if (tsMode === 'age') {
+      datasets = AGE_ORDER.map(b => ({
+        label: b, data: shareOf(ts.age[b], total),
+        borderColor: AGE_COLORS[b], tension: 0.4, cubicInterpolationMode: 'monotone', pointRadius: 1,
+      }));
+
+    } else if (tsMode === 'age_gender') {
+      datasets = AGE_ORDER
+        .filter(b => tsAgeFilter2.has(b))
+        .flatMap(b => {
+          const ds = [];
+          if (tsGenderFilter2.has('F')) ds.push({
+            label: `${b} F`, data: shareOf(ts.age_gender[`${b}_F`], total),
+            borderColor: AGE_COLORS[b], borderDash: [5, 3],
+            tension: 0.4, cubicInterpolationMode: 'monotone', pointRadius: 0,
+          });
+          if (tsGenderFilter2.has('M')) ds.push({
+            label: `${b} M`, data: shareOf(ts.age_gender[`${b}_M`], total),
+            borderColor: AGE_COLORS[b],
+            tension: 0.4, cubicInterpolationMode: 'monotone', pointRadius: 0,
+          });
+          return ds;
+        });
+    }
+
+    const pointify = arr => arr.map((y, i) => ({ x: days[i], y }));
+    datasets = datasets.map(ds => ({ ...ds, data: pointify(ds.data) }));
+
+    if (tsChart2) { tsChart2.destroy(); tsChart2 = null; }
+    const ctx = document.getElementById('ts2-canvas');
+    if (!ctx) return;
+    tsChart2 = new Chart(ctx, { type: 'line', data: { datasets }, options: TS_SHARE_OPTS });
+  }
+
+  // ── Ward time series charts (rendered in #detail-panel when a ward is clicked) ─
+  function renderWardTsChart(tsMode) {
+    const ts   = selectedWardData.time_series;
+    const days = meta.time_series.days;
+    let datasets = [];
+
+    if (tsMode === 'total') {
+      datasets = [{ label: 'All Voters', data: ts.total,
+        borderColor: '#4f93d1', backgroundColor: 'rgba(79,147,209,0.08)',
+        fill: true, tension: 0.4, cubicInterpolationMode: 'monotone', pointRadius: 1.5 }];
+    } else if (tsMode === 'gender') {
+      datasets = [
+        { label: 'Female', data: ts.gender['F'], borderColor: '#e57373', tension: 0.4, cubicInterpolationMode: 'monotone', pointRadius: 1.5 },
+        { label: 'Male',   data: ts.gender['M'], borderColor: '#64b5f6', tension: 0.4, cubicInterpolationMode: 'monotone', pointRadius: 1.5 },
+      ];
+    } else if (tsMode === 'age') {
+      datasets = AGE_ORDER.map(b => ({
+        label: b, data: ts.age[b],
+        borderColor: AGE_COLORS[b], tension: 0.4, cubicInterpolationMode: 'monotone', pointRadius: 1,
+      }));
+    } else if (tsMode === 'age_gender') {
+      datasets = AGE_ORDER
+        .filter(b => wardTsAgeFilter.has(b))
+        .flatMap(b => {
+          const ds = [];
+          if (wardTsGenderFilter.has('F')) ds.push({
+            label: `${b} F`, data: ts.age_gender[`${b}_F`],
+            borderColor: AGE_COLORS[b], borderDash: [5, 3], tension: 0.4, cubicInterpolationMode: 'monotone', pointRadius: 0,
+          });
+          if (wardTsGenderFilter.has('M')) ds.push({
+            label: `${b} M`, data: ts.age_gender[`${b}_M`],
+            borderColor: AGE_COLORS[b], tension: 0.4, cubicInterpolationMode: 'monotone', pointRadius: 0,
+          });
+          return ds;
+        });
+    }
+
+    const pointify = arr => arr.map((y, i) => ({ x: days[i], y }));
+    datasets = datasets.map(ds => ({ ...ds, data: pointify(ds.data) }));
+
+    if (wardTsChart) { wardTsChart.destroy(); wardTsChart = null; }
+    const ctx = document.getElementById('ward-ts-canvas');
+    if (!ctx) return;
+    wardTsChart = new Chart(ctx, { type: 'line', data: { datasets }, options: TS_CHART_OPTS });
+  }
+
+  function renderWardTsChart2(tsMode) {
+    const ts    = selectedWardData.time_series;
+    const days  = meta.time_series.days;
+    // Full total (includes ED) — used for Pace only
+    const total = ts.total;
+    const final = total[total.length - 1];
+    // EM-only cumulative total: subtract ED lump sum injected at day 0 (index 33)
+    // Used as denominator for demographic composition tabs so shares don't crater on election day
+    const emOnly = total.map((v, i) => i >= 33 ? v - selectedWardData.ed : v);
+    let datasets = [];
+
+    if (tsMode === 'total') {
+      // Pace: use full total including ED — this is accurate for vote timing
+      datasets = [{ label: '% of final total cast', data: total.map(c => c / final * 100),
+        borderColor: '#4f93d1', backgroundColor: 'rgba(79,147,209,0.08)',
+        fill: true, tension: 0.4, cubicInterpolationMode: 'monotone', pointRadius: 1.5 }];
+    } else if (tsMode === 'gender') {
+      // Demographic tabs: use EM-only denominator
+      datasets = [
+        { label: 'Female % (Mail & EVC)', data: shareOf(ts.gender['F'], emOnly), borderColor: '#e57373',
+          tension: 0.4, cubicInterpolationMode: 'monotone', pointRadius: 1.5 },
+        { label: 'Male % (Mail & EVC)',   data: shareOf(ts.gender['M'], emOnly), borderColor: '#64b5f6',
+          tension: 0.4, cubicInterpolationMode: 'monotone', pointRadius: 1.5 },
+      ];
+    } else if (tsMode === 'age') {
+      datasets = AGE_ORDER.map(b => ({
+        label: b, data: shareOf(ts.age[b], emOnly),
+        borderColor: AGE_COLORS[b], tension: 0.4, cubicInterpolationMode: 'monotone', pointRadius: 1,
+      }));
+    } else if (tsMode === 'age_gender') {
+      datasets = AGE_ORDER
+        .filter(b => wardTsAgeFilter2.has(b))
+        .flatMap(b => {
+          const ds = [];
+          if (wardTsGenderFilter2.has('F')) ds.push({
+            label: `${b} F`, data: shareOf(ts.age_gender[`${b}_F`], emOnly),
+            borderColor: AGE_COLORS[b], borderDash: [5, 3],
+            tension: 0.4, cubicInterpolationMode: 'monotone', pointRadius: 0,
+          });
+          if (wardTsGenderFilter2.has('M')) ds.push({
+            label: `${b} M`, data: shareOf(ts.age_gender[`${b}_M`], emOnly),
+            borderColor: AGE_COLORS[b],
+            tension: 0.4, cubicInterpolationMode: 'monotone', pointRadius: 0,
+          });
+          return ds;
+        });
+    }
+
+    const pointify = arr => arr.map((y, i) => ({ x: days[i], y }));
+    datasets = datasets.map(ds => ({ ...ds, data: pointify(ds.data) }));
+
+    if (wardTsChart2) { wardTsChart2.destroy(); wardTsChart2 = null; }
+    const ctx = document.getElementById('ward-ts2-canvas');
+    if (!ctx) return;
+    wardTsChart2 = new Chart(ctx, { type: 'line', data: { datasets }, options: TS_SHARE_OPTS });
+  }
+
+  // ── Citywide panel — rendered once after data loads ──────────────────────────
+  function renderCitywidePanel() {
+    const panel = document.getElementById('citywide-panel');
+
+    panel.innerHTML = `
+      ${cwSectionHeader('Citywide — Mail &amp; Early Vote Center')}
+      ${citywideGridHtml(meta.citywide_em, 'Mail & EVC voters', meta.citywide_em.em)}
+
+      ${cwSectionHeader('Citywide — In-Precinct')}
+      <p style="font-size:0.775rem;color:var(--text-muted);margin:0 0 10px">
+        Demographics are for in-precinct voters citywide (${meta.citywide_ed.n.toLocaleString()} voters with registration data).
+        Individual precinct assignment is unavailable for in-precinct voters; demographic breakdowns are available for mail and early vote center voters only.
+      </p>
+      ${citywideGridHtml(meta.citywide_ed, 'In-precinct voters', meta.citywide_ed.n)}
+
+      ${cwSectionHeader('Citywide — All Methods Combined')}
+      ${citywideGridHtml(meta.citywide_all, 'Total voters', meta.citywide_all.total_boe)}
+
+      ${cwSectionHeader('Citywide — Cumulative Vote Timing')}
+      <p style="font-size:0.775rem;color:var(--text-muted);margin:0 0 12px">
+        Mail and early vote center votes by return/cast date; in-precinct votes added at day 0.
+        Late mail returns continue past day 0.
+      </p>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
+        <button class="btn-toggle active" data-ts="total">Total</button>
+        <button class="btn-toggle" data-ts="gender">Gender</button>
+        <button class="btn-toggle" data-ts="age">Age</button>
+        <button class="btn-toggle" data-ts="age_gender">Age × Gender</button>
+      </div>
+
+      <!-- Age × Gender filters — hidden until that mode is active -->
+      <div id="ts-ag-filters" style="display:none;margin-bottom:12px;padding:10px 12px;
+           background:var(--bg-raised);border-radius:8px;border:1px solid var(--border)">
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:8px">
+          <span class="control-label" style="min-width:52px">Gender</span>
+          <button class="btn-toggle active" data-ts-gender="F">Female</button>
+          <button class="btn-toggle active" data-ts-gender="M">Male</button>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+          <span class="control-label" style="min-width:52px">Age</span>
+          ${AGE_ORDER.map(b => `<button class="btn-toggle active" data-ts-age="${b}">${b}</button>`).join('')}
+          <button class="btn-toggle" data-ts-age-all style="margin-left:4px;opacity:0.7">All</button>
+          <button class="btn-toggle" data-ts-age-none style="opacity:0.7">None</button>
+        </div>
+      </div>
+
+      <div style="position:relative;height:320px">
+        <canvas id="ts-canvas"></canvas>
+      </div>
+
+      ${cwSectionHeader('Citywide — Electorate Composition Over Time')}
+      <p style="font-size:0.775rem;color:var(--text-muted);margin:0 0 12px">
+        Share of cumulative votes cast from each group at each point in time.
+        Days with fewer than 200 total votes are omitted.
+      </p>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
+        <button class="btn-toggle active" data-ts2="total">Pace</button>
+        <button class="btn-toggle" data-ts2="gender">Gender</button>
+        <button class="btn-toggle" data-ts2="age">Age</button>
+        <button class="btn-toggle" data-ts2="age_gender">Age × Gender</button>
+      </div>
+
+      <div id="ts2-ag-filters" style="display:none;margin-bottom:12px;padding:10px 12px;
+           background:var(--bg-raised);border-radius:8px;border:1px solid var(--border)">
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:8px">
+          <span class="control-label" style="min-width:52px">Gender</span>
+          <button class="btn-toggle active" data-ts2-gender="F">Female</button>
+          <button class="btn-toggle active" data-ts2-gender="M">Male</button>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+          <span class="control-label" style="min-width:52px">Age</span>
+          ${AGE_ORDER.map(b => `<button class="btn-toggle active" data-ts2-age="${b}">${b}</button>`).join('')}
+          <button class="btn-toggle" data-ts2-age-all style="margin-left:4px;opacity:0.7">All</button>
+          <button class="btn-toggle" data-ts2-age-none style="opacity:0.7">None</button>
+        </div>
+      </div>
+
+      <div style="position:relative;height:320px">
+        <canvas id="ts2-canvas"></canvas>
+      </div>
+
+      ${cwSectionHeader('Download Data')}
+      <p style="font-size:0.775rem;color:var(--text-muted);margin:0 0 12px">
+        Raw vote counts by date, vote method, gender, and age bracket. In-precinct demographic breakdowns
+        are available citywide only (not by ward or precinct). See column headers for details.
+      </p>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <a href="data/chicago_2026_ward_vote_data.csv" download
+           style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;
+                  background:var(--bg-raised);border:1px solid var(--border);border-radius:6px;
+                  color:var(--text-primary);text-decoration:none;font-size:0.82rem;font-weight:500;
+                  transition:background 0.15s">
+          <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M8 2v8M5 7l3 3 3-3"/><rect x="2" y="11" width="12" height="3" rx="1" fill="currentColor" stroke="none" opacity="0.25"/>
+            <path d="M2 13h12"/>
+          </svg>
+          Ward-level CSV
+        </a>
+        <a href="data/chicago_2026_citywide_vote_data.csv" download
+           style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;
+                  background:var(--bg-raised);border:1px solid var(--border);border-radius:6px;
+                  color:var(--text-primary);text-decoration:none;font-size:0.82rem;font-weight:500;
+                  transition:background 0.15s">
+          <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M8 2v8M5 7l3 3 3-3"/><rect x="2" y="11" width="12" height="3" rx="1" fill="currentColor" stroke="none" opacity="0.25"/>
+            <path d="M2 13h12"/>
+          </svg>
+          Citywide CSV (includes in-precinct demographics)
+        </a>
+      </div>
+      <p style="font-size:0.72rem;color:var(--text-muted);margin:10px 0 0">
+        Ward CSV: ward · date · days_relative · vote_method · gender · age_bracket · count.
+        In-precinct rows per ward show total count only (no demographic breakdown available).
+        Citywide CSV: same columns minus ward; in-precinct rows include full gender × age breakdown.
+      </p>
+    `;
+
+    panel.style.display = 'block';
+  }
+
+  // ── Precinct detail panel ─────────────────────────────────────────────────────
+  function showPrecinctDetail(jf) {
+    const d     = lookupData(jf);
+    const panel = document.getElementById('detail-panel');
+    if (!d) { panel.style.display = 'none'; return; }
+
+    const label = precinctLabel(jf, d);
+
+    panel.style.display = 'block';
+    panel.innerHTML = `
+      <div class="detail-header">
+        <div class="detail-title">Chicago · ${label}</div>
+        <button class="detail-close" id="detail-close-btn">✕ Close</button>
+      </div>
+      ${detailGridHtml(d)}
+    `;
+
+    document.getElementById('detail-close-btn').addEventListener('click', () => {
+      panel.style.display = 'none';
+    });
+
+    panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  // ── Ward detail panel — demographics + per-ward vote timing ──────────────────
+  function showWardDetail(wardProp) {
+    const d     = lookupWardData(wardProp);
+    const panel = document.getElementById('detail-panel');
+    if (!d) { panel.style.display = 'none'; return; }
+
+    selectedWardData = d;
+    currentWardTs  = 'total';
+    currentWardTs2 = 'total';
+    wardTsGenderFilter  = new Set(['F','M']);
+    wardTsAgeFilter     = new Set(AGE_ORDER);
+    wardTsGenderFilter2 = new Set(['F','M']);
+    wardTsAgeFilter2    = new Set(AGE_ORDER);
+
+    panel.style.display = 'block';
+    panel.innerHTML = `
+      <div class="detail-header">
+        <div class="detail-title">Chicago · Ward ${d.ward}</div>
+        <button class="detail-close" id="detail-close-btn">✕ Close</button>
+      </div>
+
+      ${detailGridHtml(d)}
+
+      ${cwSectionHeader('Ward ' + d.ward + ' — Cumulative Vote Timing')}
+      <p style="font-size:0.775rem;color:var(--text-muted);margin:0 0 12px">
+        Mail and early vote center votes by return/cast date; estimated in-precinct votes added at day 0.
+        Demographics reflect mail and early vote center voters only.
+      </p>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
+        <button class="btn-toggle active" data-ward-ts="total">Total</button>
+        <button class="btn-toggle" data-ward-ts="gender">Gender</button>
+        <button class="btn-toggle" data-ward-ts="age">Age</button>
+        <button class="btn-toggle" data-ward-ts="age_gender">Age × Gender</button>
+      </div>
+      <div id="ward-ts-ag-filters" style="display:none;margin-bottom:12px;padding:10px 12px;
+           background:var(--bg-raised);border-radius:8px;border:1px solid var(--border)">
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:8px">
+          <span class="control-label" style="min-width:52px">Gender</span>
+          <button class="btn-toggle active" data-ward-ts-gender="F">Female</button>
+          <button class="btn-toggle active" data-ward-ts-gender="M">Male</button>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+          <span class="control-label" style="min-width:52px">Age</span>
+          ${AGE_ORDER.map(b => `<button class="btn-toggle active" data-ward-ts-age="${b}">${b}</button>`).join('')}
+          <button class="btn-toggle" data-ward-ts-age-all style="margin-left:4px;opacity:0.7">All</button>
+          <button class="btn-toggle" data-ward-ts-age-none style="opacity:0.7">None</button>
+        </div>
+      </div>
+      <div style="position:relative;height:280px">
+        <canvas id="ward-ts-canvas"></canvas>
+      </div>
+
+      ${cwSectionHeader('Ward ' + d.ward + ' — Electorate Composition Over Time')}
+      <p style="font-size:0.775rem;color:var(--text-muted);margin:0 0 6px">
+        Share of cumulative ward votes cast from each group over time.
+      </p>
+      <p style="font-size:0.775rem;color:var(--text-secondary);margin:0 0 12px">
+        <strong>The Pace tab includes in-precinct votes.</strong>
+        <strong>Demographic breakdowns (Gender, Age, Age × Gender) exclude in-precinct votes</strong>
+        — ward-level demographic data is only available for mail and early vote center voters.
+      </p>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
+        <button class="btn-toggle active" data-ward-ts2="total">Pace</button>
+        <button class="btn-toggle" data-ward-ts2="gender">Gender</button>
+        <button class="btn-toggle" data-ward-ts2="age">Age</button>
+        <button class="btn-toggle" data-ward-ts2="age_gender">Age × Gender</button>
+      </div>
+      <div id="ward-ts2-ag-filters" style="display:none;margin-bottom:12px;padding:10px 12px;
+           background:var(--bg-raised);border-radius:8px;border:1px solid var(--border)">
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:8px">
+          <span class="control-label" style="min-width:52px">Gender</span>
+          <button class="btn-toggle active" data-ward-ts2-gender="F">Female</button>
+          <button class="btn-toggle active" data-ward-ts2-gender="M">Male</button>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+          <span class="control-label" style="min-width:52px">Age</span>
+          ${AGE_ORDER.map(b => `<button class="btn-toggle active" data-ward-ts2-age="${b}">${b}</button>`).join('')}
+          <button class="btn-toggle" data-ward-ts2-age-all style="margin-left:4px;opacity:0.7">All</button>
+          <button class="btn-toggle" data-ward-ts2-age-none style="opacity:0.7">None</button>
+        </div>
+      </div>
+      <div style="position:relative;height:280px">
+        <canvas id="ward-ts2-canvas"></canvas>
+      </div>
+    `;
+
+    document.getElementById('detail-close-btn').addEventListener('click', () => {
+      panel.style.display = 'none';
+      if (wardTsChart)  { wardTsChart.destroy();  wardTsChart  = null; }
+      if (wardTsChart2) { wardTsChart2.destroy(); wardTsChart2 = null; }
+    });
+
+    setTimeout(() => { renderWardTsChart('total'); renderWardTsChart2('total'); }, 0);
+    panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  // ── Build / re-render map layer ───────────────────────────────────────────────
+  function renderLayer() {
+    if (geoLayer) { map.removeLayer(geoLayer); geoLayer = null; }
+    const gj = currentView === 'ward' ? wardGeojson : geojson;
+    if (!gj) return;
+
+    geoLayer = L.geoJSON(gj, {
+      style: featureStyle,
+      onEachFeature(feature, layer) {
+        layer.on({
+          mouseover: e => {
+            e.target.setStyle({ weight: currentView === 'ward' ? 2.5 : 2, color: 'rgba(255,255,255,0.6)' });
+            e.target.bringToFront();
+          },
+          mouseout: e => { geoLayer.resetStyle(e.target); },
+          click: () => {
+            if (currentView === 'ward') {
+              showWardDetail(feature.properties.ward);
+            } else {
+              showPrecinctDetail(feature.properties.JoinField);
+            }
+          },
+          mousemove: e => {
+            const d = lookupFeatureData(feature);
+            const label = currentView === 'ward'
+              ? wardLabel(feature.properties.ward)
+              : precinctLabel(feature.properties.JoinField, d);
+            const html = tooltipHtml(d, label, currentMode);
+            layer.bindTooltip(html, {
+              sticky: false, opacity: 0.97,
+              className: 'cem-tooltip',
+              offset: L.point(16, 0),
+              direction: 'right',
+            }).openTooltip(e.latlng);
+          },
+        });
+      },
+    }).addTo(map);
+  }
+
+  // ── Switch between precinct and ward views ────────────────────────────────────
+  async function switchToView(view) {
+    if (view === currentView) return;
+
+    // Lazy-load ward data on first switch
+    if (view === 'ward' && !wardData) {
+      document.getElementById('loading-overlay') && document.getElementById('loading-overlay').remove();
+      // Show a brief loading state on the map
+      const [geoRes, dataRes] = await Promise.all([
+        fetch(WARD_GEOJSON_PATH),
+        fetch(WARD_DATA_PATH),
+      ]);
+      wardGeojson = await geoRes.json();
+      wardData    = await dataRes.json();
+      // Compute ward-specific color scale ranges (wards are aggregates, ranges are tighter)
+      const wards = Object.values(wardData).filter(d => d.ward != null);
+      WARD_RANGES = computeRanges(wards);
+    }
+
+    currentView = view;
+    document.getElementById('detail-panel').style.display = 'none';
+    if (wardTsChart)  { wardTsChart.destroy();  wardTsChart  = null; }
+    if (wardTsChart2) { wardTsChart2.destroy(); wardTsChart2 = null; }
+    renderLayer();
+    updateLegend();
+  }
+
+  // ── View toggle (Precincts / Wards) ──────────────────────────────────────────
+  document.querySelectorAll('[data-view]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('[data-view]').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      switchToView(btn.dataset.view);
+    });
+  });
+
+  // ── Mode toggle ───────────────────────────────────────────────────────────────
+  document.querySelectorAll('[data-mode]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('[data-mode]').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentMode = btn.dataset.mode;
+      renderLayer();
+      updateLegend();
+    });
+  });
+
+  // ── Time series controls (event delegation — buttons live in #citywide-panel) ─
+  document.addEventListener('click', e => {
+
+    // Mode toggle (Total / Gender / Age / Age × Gender)
+    const modeBtn = e.target.closest('[data-ts]');
+    if (modeBtn) {
+      document.querySelectorAll('[data-ts]').forEach(b => b.classList.remove('active'));
+      modeBtn.classList.add('active');
+      currentTsMode = modeBtn.dataset.ts;
+      const filters = document.getElementById('ts-ag-filters');
+      if (filters) filters.style.display = currentTsMode === 'age_gender' ? 'block' : 'none';
+      renderTsChart(currentTsMode);
+      return;
+    }
+
+    // Gender filter toggle
+    const gBtn = e.target.closest('[data-ts-gender]');
+    if (gBtn) {
+      const g = gBtn.dataset.tsGender;
+      tsGenderFilter.has(g) ? tsGenderFilter.delete(g) : tsGenderFilter.add(g);
+      gBtn.classList.toggle('active', tsGenderFilter.has(g));
+      renderTsChart('age_gender');
+      return;
+    }
+
+    // Age "All" shortcut
+    if (e.target.closest('[data-ts-age-all]')) {
+      AGE_ORDER.forEach(b => tsAgeFilter.add(b));
+      document.querySelectorAll('[data-ts-age]').forEach(b => b.classList.add('active'));
+      renderTsChart('age_gender');
+      return;
+    }
+
+    // Age "None" shortcut
+    if (e.target.closest('[data-ts-age-none]')) {
+      tsAgeFilter.clear();
+      document.querySelectorAll('[data-ts-age]').forEach(b => b.classList.remove('active'));
+      renderTsChart('age_gender');
+      return;
+    }
+
+    // Individual age bracket toggle
+    const ageBtn = e.target.closest('[data-ts-age]');
+    if (ageBtn) {
+      const b = ageBtn.dataset.tsAge;
+      tsAgeFilter.has(b) ? tsAgeFilter.delete(b) : tsAgeFilter.add(b);
+      ageBtn.classList.toggle('active', tsAgeFilter.has(b));
+      renderTsChart('age_gender');
+      return;
+    }
+
+  });
+
+  // ── Chart 2 controls (event delegation) ──────────────────────────────────────
+  document.addEventListener('click', e => {
+
+    // Chart 2 mode toggle
+    const modeBtn2 = e.target.closest('[data-ts2]');
+    if (modeBtn2) {
+      document.querySelectorAll('[data-ts2]').forEach(b => b.classList.remove('active'));
+      modeBtn2.classList.add('active');
+      currentTsMode2 = modeBtn2.dataset.ts2;
+      const f2 = document.getElementById('ts2-ag-filters');
+      if (f2) f2.style.display = currentTsMode2 === 'age_gender' ? 'block' : 'none';
+      renderTsChart2(currentTsMode2);
+      return;
+    }
+
+    // Chart 2 gender filter
+    const gBtn2 = e.target.closest('[data-ts2-gender]');
+    if (gBtn2) {
+      const g = gBtn2.dataset.ts2Gender;
+      tsGenderFilter2.has(g) ? tsGenderFilter2.delete(g) : tsGenderFilter2.add(g);
+      gBtn2.classList.toggle('active', tsGenderFilter2.has(g));
+      renderTsChart2('age_gender');
+      return;
+    }
+
+    // Chart 2 age All/None shortcuts
+    if (e.target.closest('[data-ts2-age-all]')) {
+      AGE_ORDER.forEach(b => tsAgeFilter2.add(b));
+      document.querySelectorAll('[data-ts2-age]').forEach(b => b.classList.add('active'));
+      renderTsChart2('age_gender');
+      return;
+    }
+    if (e.target.closest('[data-ts2-age-none]')) {
+      tsAgeFilter2.clear();
+      document.querySelectorAll('[data-ts2-age]').forEach(b => b.classList.remove('active'));
+      renderTsChart2('age_gender');
+      return;
+    }
+
+    // Chart 2 individual age bracket
+    const ageBtn2 = e.target.closest('[data-ts2-age]');
+    if (ageBtn2) {
+      const b = ageBtn2.dataset.ts2Age;
+      tsAgeFilter2.has(b) ? tsAgeFilter2.delete(b) : tsAgeFilter2.add(b);
+      ageBtn2.classList.toggle('active', tsAgeFilter2.has(b));
+      renderTsChart2('age_gender');
+      return;
+    }
+
+  });
+
+  // ── Ward detail chart controls (event delegation) ─────────────────────────────
+  document.addEventListener('click', e => {
+
+    const wModeBtn = e.target.closest('[data-ward-ts]');
+    if (wModeBtn) {
+      document.querySelectorAll('[data-ward-ts]').forEach(b => b.classList.remove('active'));
+      wModeBtn.classList.add('active');
+      currentWardTs = wModeBtn.dataset.wardTs;
+      const f = document.getElementById('ward-ts-ag-filters');
+      if (f) f.style.display = currentWardTs === 'age_gender' ? 'block' : 'none';
+      renderWardTsChart(currentWardTs);
+      return;
+    }
+
+    const wGBtn = e.target.closest('[data-ward-ts-gender]');
+    if (wGBtn) {
+      const g = wGBtn.dataset.wardTsGender;
+      wardTsGenderFilter.has(g) ? wardTsGenderFilter.delete(g) : wardTsGenderFilter.add(g);
+      wGBtn.classList.toggle('active', wardTsGenderFilter.has(g));
+      renderWardTsChart('age_gender');
+      return;
+    }
+
+    if (e.target.closest('[data-ward-ts-age-all]')) {
+      AGE_ORDER.forEach(b => wardTsAgeFilter.add(b));
+      document.querySelectorAll('[data-ward-ts-age]').forEach(b => b.classList.add('active'));
+      renderWardTsChart('age_gender');
+      return;
+    }
+    if (e.target.closest('[data-ward-ts-age-none]')) {
+      wardTsAgeFilter.clear();
+      document.querySelectorAll('[data-ward-ts-age]').forEach(b => b.classList.remove('active'));
+      renderWardTsChart('age_gender');
+      return;
+    }
+
+    const wAgeBtn = e.target.closest('[data-ward-ts-age]');
+    if (wAgeBtn) {
+      const b = wAgeBtn.dataset.wardTsAge;
+      wardTsAgeFilter.has(b) ? wardTsAgeFilter.delete(b) : wardTsAgeFilter.add(b);
+      wAgeBtn.classList.toggle('active', wardTsAgeFilter.has(b));
+      renderWardTsChart('age_gender');
+      return;
+    }
+
+    // Ward chart 2
+    const wModeBtn2 = e.target.closest('[data-ward-ts2]');
+    if (wModeBtn2) {
+      document.querySelectorAll('[data-ward-ts2]').forEach(b => b.classList.remove('active'));
+      wModeBtn2.classList.add('active');
+      currentWardTs2 = wModeBtn2.dataset.wardTs2;
+      const f2 = document.getElementById('ward-ts2-ag-filters');
+      if (f2) f2.style.display = currentWardTs2 === 'age_gender' ? 'block' : 'none';
+      renderWardTsChart2(currentWardTs2);
+      return;
+    }
+
+    const wGBtn2 = e.target.closest('[data-ward-ts2-gender]');
+    if (wGBtn2) {
+      const g = wGBtn2.dataset.wardTs2Gender;
+      wardTsGenderFilter2.has(g) ? wardTsGenderFilter2.delete(g) : wardTsGenderFilter2.add(g);
+      wGBtn2.classList.toggle('active', wardTsGenderFilter2.has(g));
+      renderWardTsChart2('age_gender');
+      return;
+    }
+
+    if (e.target.closest('[data-ward-ts2-age-all]')) {
+      AGE_ORDER.forEach(b => wardTsAgeFilter2.add(b));
+      document.querySelectorAll('[data-ward-ts2-age]').forEach(b => b.classList.add('active'));
+      renderWardTsChart2('age_gender');
+      return;
+    }
+    if (e.target.closest('[data-ward-ts2-age-none]')) {
+      wardTsAgeFilter2.clear();
+      document.querySelectorAll('[data-ward-ts2-age]').forEach(b => b.classList.remove('active'));
+      renderWardTsChart2('age_gender');
+      return;
+    }
+
+    const wAgeBtn2 = e.target.closest('[data-ward-ts2-age]');
+    if (wAgeBtn2) {
+      const b = wAgeBtn2.dataset.wardTs2Age;
+      wardTsAgeFilter2.has(b) ? wardTsAgeFilter2.delete(b) : wardTsAgeFilter2.add(b);
+      wAgeBtn2.classList.toggle('active', wardTsAgeFilter2.has(b));
+      renderWardTsChart2('age_gender');
+      return;
+    }
+
+  });
+
+  // ── Init ──────────────────────────────────────────────────────────────────────
+  async function init() {
+    map = L.map('map-container', {
+      center: [41.845, -87.67],
+      zoom: 11,
+      zoomControl: true,
+      renderer: L.canvas({ padding: 0.5 }),
+    });
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors',
+      maxZoom: 19,
+    }).addTo(map);
+
+    const [geoRes, dataRes] = await Promise.all([
+      fetch(GEOJSON_PATH),
+      fetch(DATA_PATH),
+    ]);
+
+    geojson = await geoRes.json();
+    data    = await dataRes.json();
+
+    // Pull precomputed citywide aggregates from the reserved _meta key
+    meta = data._meta;
+
+    // Compute data-driven color scale ranges from actual precinct values
+    const precincts = Object.values(data).filter(d => d.ward != null);
+    PRECINCT_RANGES = computeRanges(precincts);
+
+    // Aggregate citywide ballot + registration totals (not stored in _meta)
+    citywideAgg = precincts.reduce((acc, d) => {
+      acc.dem        += d.dem        || 0;
+      acc.gop        += d.gop        || 0;
+      acc.lib        += d.lib        || 0;
+      acc.total_boe  += d.total_boe  || 0;
+      acc.registered += d.registered || 0;
+      return acc;
+    }, { dem: 0, gop: 0, lib: 0, total_boe: 0, registered: 0 });
+
+    renderLayer();
+    updateLegend();
+    renderCitywidePanel();
+    setTimeout(() => { renderTsChart('total'); renderTsChart2('total'); }, 0);
+
+    map.fitBounds(geoLayer.getBounds(), { padding: [20, 20] });
+
+    const overlay = document.getElementById('loading-overlay');
+    overlay.classList.add('hidden');
+    setTimeout(() => overlay.remove(), 500);
+    setTimeout(() => map.invalidateSize(), 50);
+  }
+
+  init().catch(err => {
+    console.error('Failed to load data:', err);
+    document.querySelector('.loading-text').textContent = 'Failed to load data.';
+    document.querySelector('.loading-sub').textContent  = err.message;
+  });
+
+})();
+</script>
+</body>
+</html>

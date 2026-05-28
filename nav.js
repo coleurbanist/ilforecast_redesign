@@ -21,6 +21,7 @@
       children: [
         { label: 'Precinct Results', href: 'maps.html' },
         { label: 'County Maps', href: 'county_maps.html' },
+        { label: 'Voter Demographics', href: 'chicago_voter_demographics_map.html' },
       ],
     },
   ];
